@@ -16,10 +16,11 @@
 (defmacro with-temporary-allocations (allocs &body body)
   `(let (,@allocs)
     (unwind-protect
-      (progn ,@body)
-      ,@(mapcar (lambda (alloc) (list 'cffi:foreign-free (first alloc))) allocs))))
+         (progn ,@body)
+      ,@(mapcar (lambda (alloc) (list 'cffi:foreign-free (first alloc)))
+                allocs))))
 
-             
+
 
 
 ;;; rav:
@@ -43,22 +44,23 @@
 (define-condition sql-warning (sql-condition warning)
   ())
 
+;; TODO: Why doesn't this use with-temporary-allocations? -dso
 (defun handle-error (henv hdbc hstmt)
-   (let
-       ((sql-state (alloc-chars 256))
-        (error-message (alloc-chars #.$SQL_MAX_MESSAGE_LENGTH))
-        (error-code (cffi:foreign-alloc :long))
-        (msg-length (cffi:foreign-alloc :short)))
-     (SQLError henv 
-               hdbc 
-               hstmt sql-state
-               error-code error-message
-               $SQL_MAX_MESSAGE_LENGTH msg-length)
-     (values
-      (get-string-nts error-message)
-      (get-string-nts sql-state)
-      (cffi:mem-ref msg-length :short)
-      (cffi:mem-ref error-code :long))))
+  (let
+      ((sql-state (alloc-chars 256))
+       (error-message (alloc-chars #.$SQL_MAX_MESSAGE_LENGTH))
+       (error-code (cffi:foreign-alloc 'sql-integer))
+       (msg-length (cffi:foreign-alloc 'sql-small-int)))
+    (SQLError henv
+              hdbc
+              hstmt sql-state
+              error-code error-message
+              $SQL_MAX_MESSAGE_LENGTH msg-length)
+    (values
+     (get-string-nts error-message)
+     (get-string-nts sql-state)
+     (cffi:mem-ref msg-length 'sql-small-int)
+     (cffi:mem-ref error-code 'sql-integer))))
 
 
 ; test this: return a keyword for efficiency
@@ -66,14 +68,14 @@
 ;; problem: calling SQLError clears the error state
 ;#+ignore
 (defun sql-state (henv hdbc hstmt)
-  (with-temporary-allocations 
+  (with-temporary-allocations
       ((sql-state (cffi:foreign-alloc :char :count 256))
        (error-message (cffi:foreign-alloc :char :count $SQL_MAX_MESSAGE_LENGTH))
-       (error-code (cffi:foreign-alloc :long))
-       (msg-length (cffi:foreign-alloc :short)))
+       (error-code (cffi:foreign-alloc 'sql-integer))
+       (msg-length (cffi:foreign-alloc 'sql-small-int)))
     (SQLError henv hdbc hstmt sql-state error-code
               error-message $SQL_MAX_MESSAGE_LENGTH msg-length)
-    (get-string sql-state 5) ;(%cstring-to-keyword sql-state)
+    (get-string sql-state 5)          ;(%cstring-to-keyword sql-state)
     ))
 
 ;;; rav:
@@ -164,30 +166,24 @@
 
 
 (defun %new-environment-handle ()
-  (cffi:with-foreign-object (phenv 'sql-handle)
+  (cffi:with-foreign-object (phenv 'sql-h-env)
     (with-error-handling
-      ()
-      (SQLAllocEnv phenv)
-      (cffi:mem-ref phenv 'sql-handle)
-      )))
-
-(defun %sql-free-environment (henv)
-  (with-error-handling 
-    (:henv henv)
-    (SQLFreeEnv henv)))
+        ()
+        (SQLAllocEnv phenv)
+      (cffi:mem-ref phenv 'sql-h-env))))
 
 (defun %new-db-connection-handle (henv)
-  (cffi:with-foreign-object (phdbc 'sql-handle)  
+  (cffi:with-foreign-object (phdbc 'sql-h-dbc)
     (with-error-handling
         (:henv henv)
-      (SQLAllocConnect henv phdbc)
-      (cffi:mem-ref phdbc 'sql-handle))))
+        (SQLAllocConnect henv phdbc)
+      (cffi:mem-ref phdbc 'sql-h-dbc))))
 
 (defun %free-statement (hstmt option)
-  (with-error-handling 
+  (with-error-handling
       (:hstmt hstmt)
-      (SQLFreeStmt 
-       hstmt 
+      (SQLFreeStmt
+       hstmt
        (ecase option
          (:drop $SQL_DROP)
          (:close $SQL_CLOSE)
@@ -216,83 +212,78 @@
 
 ;; functional interface
 
-(defun %sql-connect (hdbc server uid pwd)
-  (cffi:with-foreign-string (server-ptr server)
-    (cffi:with-foreign-string (uid-ptr uid)
-      (cffi:with-foreign-string (pwd-ptr pwd)
-        (with-error-handling 
-            (:hdbc hdbc)
-      (SQLConnect hdbc server-ptr $SQL_NTS uid-ptr 
-                  $SQL_NTS pwd-ptr $SQL_NTS))))))
-
 ;;
 (defun %sql-driver-connect (henv hdbc connection-string completion-option)
+  (declare (string connection-string))
   (let ((completion-option
          (ecase completion-option
            (:complete $SQL_DRIVER_COMPLETE)
            (:required $SQL_DRIVER_COMPLETE_REQUIRED)
            (:prompt $SQL_DRIVER_PROMPT)
            (:noprompt $SQL_DRIVER_NOPROMPT))))
-    (cffi:with-foreign-string (connection-str-ptr  connection-string)
+    (cffi:with-foreign-string (connection-str-ptr connection-string)
       (with-temporary-allocations
           ((complete-connection-str-ptr (alloc-chars 1024))
-           (length-ptr (cffi:foreign-alloc :short)))
-        (with-error-handling 
+           (length-ptr (cffi:foreign-alloc 'sql-small-int)))
+        (with-error-handling
             (:henv henv :hdbc hdbc)
-          
-          (SQLDriverConnect hdbc 
-                            (cffi:null-pointer) ; no window
-                            connection-str-ptr 
-                            (length connection-string)
-                                        ;$SQL_NTS
-                            complete-connection-str-ptr 
-                            1024
-                            length-ptr 
-                            completion-option))
+            
+            (SQLDriverConnect hdbc
+                              (cffi:null-pointer) ; no window
+                              connection-str-ptr ; TODO: How does
+						 ; encoding affect the
+						 ; length?
+                              (length connection-string) ;$SQL_NTS
+                              complete-connection-str-ptr
+                              1024
+                              length-ptr
+                              completion-option))
         (get-string-nts complete-connection-str-ptr)))))
 
 (defun %disconnect (hdbc)
-  (with-error-handling 
-    (:hdbc hdbc)
-    (SQLDisconnect hdbc)))
+  (with-error-handling
+      (:hdbc hdbc)
+      (SQLDisconnect hdbc)))
 
 (defun %commit (henv hdbc)
-  (with-error-handling 
-    (:henv henv :hdbc hdbc)
-    (SQLTransact 
-     henv hdbc $SQL_COMMIT)))
+  (with-error-handling
+      (:henv henv :hdbc hdbc)
+      (SQLTransact
+       henv hdbc $SQL_COMMIT)))
 
 (defun %rollback (henv hdbc)
-  (with-error-handling 
-    (:henv henv :hdbc hdbc)
-    (SQLTransact 
-     henv hdbc $SQL_ROLLBACK)))
+  (with-error-handling
+      (:henv henv :hdbc hdbc)
+      (SQLTransact
+       henv hdbc $SQL_ROLLBACK)))
 
 ; col-nr is zero-based in Lisp
 ; col-nr = :bookmark retrieves a bookmark.
 (defun %bind-column (hstmt column-nr c-type data-ptr precision out-len-ptr)
+  (declare (type (integer 0) column-nr))
   (with-error-handling
-    (:hstmt hstmt)
-    (SQLBindCol hstmt
-                (if (eq column-nr :bookmark) 0 (1+ column-nr))
-                c-type data-ptr precision out-len-ptr)))
+      (:hstmt hstmt)
+      (SQLBindCol hstmt
+                  (if (eq column-nr :bookmark) 0 (1+ column-nr))
+                  c-type data-ptr precision out-len-ptr)))
 
 ; parameter-nr is zero-based in Lisp
 (defun %sql-bind-parameter (hstmt parameter-nr parameter-type c-type
-                                      sql-type precision scale data-ptr
-                                      max-value out-len-ptr)
+                            sql-type precision scale data-ptr
+                            max-value out-len-ptr)
+  (declare (type (integer 0) parameter-nr))
   (with-error-handling
-    (:hstmt hstmt)
-    (SQLBindParameter hstmt (1+ parameter-nr)
-                      parameter-type ;$SQL_PARAM_INPUT 
-                      c-type ;$SQL_C_CHAR
-                      sql-type ;$SQL_VARCHAR
-                      precision ;(1- (length str))
-                      scale ;0
-                      data-ptr
-                      max-value
-                      out-len-ptr ;#.(cffi:null-pointer)
-                      )))
+      (:hstmt hstmt)
+      (SQLBindParameter hstmt (1+ parameter-nr)
+                        parameter-type  ;$SQL_PARAM_INPUT
+                        c-type          ;$SQL_C_CHAR
+                        sql-type        ;$SQL_VARCHAR
+                        precision       ;(1- (length str))
+                        scale           ;0
+                        data-ptr
+                        max-value
+                        out-len-ptr     ;#.(cffi:null-pointer)
+                        )))
 
 (defun %sql-fetch (hstmt)
   (with-error-handling 
@@ -300,12 +291,12 @@
       (SQLFetch hstmt)))
 
 (defun %new-statement-handle (hdbc)
-  (with-temporary-allocations  
-      ((hstmt-ptr (cffi:foreign-alloc 'sql-handle)))
-    (with-error-handling 
+  (with-temporary-allocations
+      ((hstmt-ptr (cffi:foreign-alloc 'sql-h-stmt)))
+    (with-error-handling
         (:hdbc hdbc)
-      (SQLAllocStmt hdbc hstmt-ptr) 
-      (cffi:mem-ref hstmt-ptr 'sql-handle))))
+        (SQLAllocStmt hdbc hstmt-ptr)
+      (cffi:mem-ref hstmt-ptr 'sql-h-stmt))))
 
 (defun %sql-get-info (hdbc info-type)
   (ecase info-type
@@ -343,17 +334,19 @@
       #.$SQL_SPECIAL_CHARACTERS
       #.$SQL_TABLE_TERM
       #.$SQL_USER_NAME)
-     (with-temporary-allocations 
+     (with-temporary-allocations
          ((info-ptr (alloc-chars 1024))
-          (info-length-ptr (cffi:foreign-alloc :short)))
-       (with-error-handling 
-         (:hdbc hdbc)
-	 #-pcl
+          (info-length-ptr (cffi:foreign-alloc 'sql-small-int)))
+       (with-error-handling
+           (:hdbc hdbc)
+           #-pcl
          (SQLGetInfo hdbc info-type info-ptr 1023 info-length-ptr)
-	 #+pcl
+         #+pcl
          (SQLGetInfo-Str hdbc info-type info-ptr 1023 info-length-ptr)
+         ;; TODO: I believe the following assumes that the buffer was
+         ;; big enough to include the null-terminator.
          (get-string-nts info-ptr))))
-    ;; those returning a word
+    ;; those returning a 16-bit integer
     ((#.$SQL_ACTIVE_CONNECTIONS
       #.$SQL_ACTIVE_STATEMENTS
       #.$SQL_CONCAT_NULL_BEHAVIOR
@@ -382,19 +375,18 @@
       #.$SQL_QUOTED_IDENTIFIER_CASE
       #.$SQL_TXN_CAPABLE)
      (with-temporary-allocations
-         ((info-ptr (cffi::foreign-alloc :short))
-          (info-length-ptr (cffi::foreign-alloc :short)))
-       (with-error-handling 
-	(:hdbc hdbc)
-         (SQLGetInfo hdbc
-		     info-type
-		     info-ptr
-		     255
-		     info-length-ptr)
-         (cffi:mem-ref info-ptr :short)))
-     )
-    ;; those returning a long bitmask
-    ((#.$SQL_ALTER_TABLE 
+         ((info-ptr (cffi::foreign-alloc 'sql-small-int))
+          (info-length-ptr (cffi::foreign-alloc 'sql-small-int)))
+       (with-error-handling
+           (:hdbc hdbc)
+           (SQLGetInfo hdbc
+                       info-type
+                       info-ptr
+                       0
+                       info-length-ptr)
+         (cffi:mem-ref info-ptr 'sql-small-int))))
+    ;; those returning a 32-bit bitmask
+    ((#.$SQL_ALTER_TABLE
       #.$SQL_BOOKMARK_PERSISTENCE
       #.$SQL_CONVERT_BIGINT
       #.$SQL_CONVERT_BINARY
@@ -439,19 +431,23 @@
       #.$SQL_TIMEDATE_FUNCTIONS
       #.$SQL_TXN_ISOLATION_OPTION
       #.$SQL_UNION)
-      (with-temporary-allocations 
-          ((info-ptr (cffi:foreign-alloc :unsigned-long))
-           (info-length-ptr (cffi:foreign-alloc :short)))
-       (with-error-handling 
-         (:hdbc hdbc)
-         (SQLGetInfo hdbc
-		     info-type
-		     info-ptr
-		     255
-		     info-length-ptr)
-         (cffi:mem-ref info-ptr :unsigned-long)))
-     )
-    ;; those returning a long integer
+     (with-temporary-allocations
+         ;; TODO: It'd be nice to have this as a sql-* type.  However,
+         ;; while the X/Open spec is usually quiet about data sizes,
+         ;; it specifically says a 32-bit bitmask for these; so if
+         ;; SQL-INTEGER changes to 64-bit, these may or may not change
+         ;; as well. -dso
+         ((info-ptr (cffi:foreign-alloc :uint32))
+          (info-length-ptr (cffi:foreign-alloc 'sql-small-int)))
+       (with-error-handling
+           (:hdbc hdbc)
+           (SQLGetInfo hdbc
+                       info-type
+                       info-ptr
+                       0
+                       info-length-ptr)
+         (cffi:mem-ref info-ptr :uint32))))
+    ;; those returning an integer
     ((#.$SQL_DEFAULT_TXN_ISOLATION
       #.$SQL_DRIVER_HDBC
       #.$SQL_DRIVER_HENV
@@ -461,45 +457,40 @@
       #.$SQL_IDENTIFIER_CASE
       #.$SQL_MAX_BINARY_LITERAL_LEN
       #.$SQL_MAX_CHAR_LITERAL_LEN
-      #.$SQL_ACTIVE_ENVIRONMENTS
-      )
-     (with-temporary-allocations 
-         ((info-ptr (cffi:foreign-alloc :long))
-          (info-length-ptr (cffi:foreign-alloc :short)))
-       (with-error-handling 
-         (:hdbc hdbc)
-         (SQLGetInfo hdbc info-type info-ptr 255 info-length-ptr)
-         (cffi:mem-ref info-ptr :unsigned-long))))))
+      #.$SQL_ACTIVE_ENVIRONMENTS)
+     (with-temporary-allocations
+         ((info-ptr (cffi:foreign-alloc 'sql-integer))
+          (info-length-ptr (cffi:foreign-alloc 'sql-small-int)))
+       (with-error-handling
+           (:hdbc hdbc)
+           (SQLGetInfo hdbc info-type info-ptr 0 info-length-ptr)
+         (cffi:mem-ref info-ptr 'sql-integer))))))
 
 (defun %sql-exec-direct (sql hstmt henv hdbc)
+  (declare (string sql))
   (cffi:with-foreign-string (sql-ptr sql)
     (with-error-handling
         (:hstmt hstmt :henv henv :hdbc hdbc)
-      (SQLExecDirect hstmt sql-ptr $SQL_NTS))))
-
-(defun %sql-cancel (hstmt)
-  (with-error-handling
-    (:hstmt hstmt)
-    (SQLCancel hstmt)))
+        (SQLExecDirect hstmt sql-ptr $SQL_NTS))))
 
 (defun %sql-execute (hstmt)
   (with-error-handling
-    (:hstmt hstmt)
-    (SQLExecute hstmt)))
+      (:hstmt hstmt)
+      (SQLExecute hstmt)))
 
 (defun result-columns-count (hstmt)
   (with-temporary-allocations 
-      ((columns-nr-ptr (cffi:foreign-alloc :short)))
+      ((columns-nr-ptr (cffi:foreign-alloc 'sql-small-int)))
     (with-error-handling (:hstmt hstmt)
-                         (SQLNumResultCols hstmt columns-nr-ptr)
-      (cffi:mem-ref columns-nr-ptr :short))))
+        (SQLNumResultCols hstmt columns-nr-ptr)
+      (cffi:mem-ref columns-nr-ptr 'sql-small-int))))
 
 (defun result-rows-count (hstmt)
   (with-temporary-allocations 
-      ((row-count-ptr (cffi:foreign-alloc :long)))
+      ((row-count-ptr (cffi:foreign-alloc 'sql-len)))
     (with-error-handling (:hstmt hstmt)
-                         (SQLRowCount hstmt row-count-ptr)
-      (cffi:mem-ref row-count-ptr :long))))
+        (SQLRowCount hstmt row-count-ptr)
+      (cffi:mem-ref row-count-ptr 'sql-len))))
 
 
 ;;; fixme, the whole column descriptiopn stuff should be put into one loop
@@ -507,58 +498,27 @@
 
 ;; Column counting is 1-based
 (defun %describe-column (hstmt column-nr)
-  (with-temporary-allocations ((column-name-ptr (alloc-chars 256))
-                               (column-name-length-ptr (cffi:foreign-alloc :short))
-                               (column-sql-type-ptr (cffi:foreign-alloc :short))
-                               (column-precision-ptr (cffi:foreign-alloc :unsigned-long))
-                               (column-scale-ptr (cffi:foreign-alloc :short))
-                               (column-nullable-p-ptr (cffi:foreign-alloc :short)))
+  (declare (type (integer 1) column-nr))
+  (with-temporary-allocations
+      ((column-name-ptr (alloc-chars 256))
+       (column-name-length-ptr (cffi:foreign-alloc 'sql-small-int))
+       (column-sql-type-ptr (cffi:foreign-alloc 'sql-small-int))
+       (column-precision-ptr (cffi:foreign-alloc 'sql-u-len))
+       (column-scale-ptr (cffi:foreign-alloc 'sql-small-int))
+       (column-nullable-p-ptr (cffi:foreign-alloc 'sql-small-int)))
     (with-error-handling (:hstmt hstmt)
-                         (SQLDescribeCol hstmt column-nr column-name-ptr 256
-                                         column-name-length-ptr
-                                         column-sql-type-ptr
-                                         column-precision-ptr
-                                         column-scale-ptr
-                                         column-nullable-p-ptr)
-      (values
-       (get-string-nts column-name-ptr)
-       (cffi:mem-ref column-sql-type-ptr :short)
-       (cffi:mem-ref column-precision-ptr :unsigned-long)
-       (cffi:mem-ref column-scale-ptr :short)
-       (cffi:mem-ref column-nullable-p-ptr :short)))))
-
-;; parameter counting is 1-based
-(defun %describe-parameter (hstmt parameter-nr)
-  (with-temporary-allocations ((column-sql-type-ptr (cffi:foreign-alloc :short))
-                               (column-precision-ptr (cffi:foreign-alloc :long))
-                               (column-scale-ptr (cffi:foreign-alloc :short))
-                               (column-nullable-p-ptr (cffi:foreign-alloc :short)))
-    (with-error-handling 
-      (:hstmt hstmt)
-      (SQLDescribeParam hstmt parameter-nr
-			column-sql-type-ptr
+        (SQLDescribeCol hstmt column-nr column-name-ptr 256
+                        column-name-length-ptr
+                        column-sql-type-ptr
                         column-precision-ptr
-			column-scale-ptr
+                        column-scale-ptr
                         column-nullable-p-ptr)
       (values
-       (cffi:mem-ref column-sql-type-ptr :short)
-       (cffi:mem-ref column-precision-ptr :unsigned-long)
-       (cffi:mem-ref column-scale-ptr :short)
-       (cffi:mem-ref column-nullable-p-ptr :short)))))
-
-(defun %column-attributes (hstmt column-nr descriptor-type)
-  (with-temporary-allocations 
-      ((descriptor-info-ptr (alloc-chars  256))
-       (descriptor-length-ptr (cffi:foreign-alloc :short))
-       (numeric-descriptor-ptr (cffi:foreign-alloc :long)))
-    (with-error-handling
-      (:hstmt hstmt) 
-      (SQLColAttributes hstmt column-nr descriptor-type descriptor-info-ptr 256
-                        descriptor-length-ptr
-			numeric-descriptor-ptr)
-      (values
-       (get-string-nts descriptor-info-ptr)
-       (cffi:mem-ref numeric-descriptor-ptr :long)))))
+       (get-string-nts column-name-ptr)
+       (cffi:mem-ref column-sql-type-ptr 'sql-small-int)
+       (cffi:mem-ref column-precision-ptr 'sql-u-len)
+       (cffi:mem-ref column-scale-ptr 'sql-small-int)
+       (cffi:mem-ref column-nullable-p-ptr 'sql-small-int)))))
 
 
 ;; fixme, include it later
@@ -589,45 +549,16 @@
                                table-name column-name)
     (fetch-all-rows hstmt)))
 
-(defun %sql-data-sources (henv &key (direction :first))
-  (with-temporary-allocations 
-      ((name-ptr (alloc-chars (1+ $SQL_MAX_DSN_LENGTH)))
-       (name-length-ptr (cffi:foreign-alloc :short))
-       (description-ptr (alloc-chars 1024))
-       (description-length-ptr (cffi:foreign-alloc :short)))
-    (let ((res (with-error-handling
-                   (:henv henv)
-                 (SQLDataSources henv
-                                 (ecase direction
-                                   (:first $SQL_FETCH_FIRST)
-                                   (:next $SQL_FETCH_NEXT))
-                                 name-ptr
-                                 (1+ $SQL_MAX_DSN_LENGTH)
-                                 name-length-ptr
-                                 description-ptr
-                                 1024
-                                 description-length-ptr))))
-      (unless (= res $SQL_NO_DATA_FOUND)
-        (values (get-string-nts name-ptr)
-                (get-string-nts description-ptr))))))
-
 
 (defun %sql-prepare (hstmt sql)
+  (declare (string sql))
   (cffi:with-foreign-string (sql-ptr sql)
     (with-error-handling (:hstmt hstmt)
-      (SQLPrepare hstmt sql-ptr $SQL_NTS))))
-
-;; depending on option, we return a long int or a string; string not implemented
-(defun get-connection-option (hdbc option)
-  (with-temporary-allocations 
-      ((param-ptr (cffi:foreign-alloc  :long))) ;#+ignore #.(1+ $SQL_MAX_OPTION_STRING_LENGTH)))
-    (with-error-handling (:hdbc hdbc)
-      (SQLGetConnectOption hdbc option param-ptr)
-      (cffi:mem-ref param-ptr :long))))
+        (SQLPrepare hstmt sql-ptr $SQL_NTS))))
 
 (defun set-connection-option (hdbc option param)
   (with-error-handling (:hdbc hdbc)
-    (SQLSetConnectOption hdbc option param)))
+      (SQLSetConnectOption hdbc option param)))
 
 (defun disable-autocommit (hdbc)
   (set-connection-option hdbc $SQL_AUTOCOMMIT $SQL_AUTOCOMMIT_OFF))
@@ -636,18 +567,19 @@
   (set-connection-option hdbc $SQL_AUTOCOMMIT $SQL_AUTOCOMMIT_ON))
 
 
-***
+;;;***
 ;;; rav, 11.6.2005
 ;;; added tracing support
 
 (defun set-connection-attr-integer (hdbc option val)
   (with-error-handling (:hdbc hdbc)
-    (SQLSetConnectAttr_long hdbc option val 0)))
+      (SQLSetConnectAttr_long hdbc option val 0)))
 
 (defun set-connection-attr-string (hdbc option val)
-  (with-error-handling (:hdbc hdbc)
-    (cffi:with-foreign-string (ptr val)
-      (SQLSetConnectAttr_string hdbc option ptr (length val)))))
+  (with-error-handling  (:hdbc hdbc)
+      (cffi:with-foreign-string (ptr val)
+        ;; TODO: Null-terminator with length?
+        (SQLSetConnectAttr_string hdbc option ptr (length val)))))
 
 (defun %start-connection-trace (hdbc filename)
   (set-connection-attr-string hdbc  $SQL_ATTR_TRACEFILE	filename)
@@ -655,65 +587,19 @@
 
 (defun %stop-connection-trace (hdbc)
   (set-connection-attr-integer hdbc $SQL_ATTR_TRACE	$SQL_OPT_TRACE_OFF))
-  
-
-(defun get-connection-attr-integer (hdbc attr)
-  (with-temporary-allocations
-      ((ptr (cffi:foreign-alloc :long))
-       (lenptr (cffi:foreign-alloc :long)))
-    (with-error-handling (:hdbc hdbc)
-      (SQLGetConnectAttr hdbc attr ptr 0 lenptr))
-    (cffi:mem-ref ptr :long)))
-
-(defun get-connection-attr-string (hdbc attr)
-  (with-temporary-allocations 
-      ((ptr (alloc-chars 256))
-       (lenptr (cffi:foreign-alloc :long)))
-    (with-error-handling (:hdbc hdbc)
-      (SQLGetConnectAttr hdbc attr ptr 256 lenptr))
-    (get-string  ptr (cffi:mem-ref lenptr :long))))
-
-;;; small test for the get-connection-attr
-(defun %get-current-catalog (hdbc)
-  (get-connection-attr-string hdbc $SQL_ATTR_CURRENT_CATALOG))
-
-(defun %set-current-catalog (hdbc catalog)
-  (set-connection-attr-string hdbc $SQL_ATTR_CURRENT_CATALOG catalog))
-
-
-
-(defun %connection-ok-p (hdbc)
-  (with-error-handling (:hdbc hdbc)
-    (ecase (get-connection-attr-integer hdbc $SQL_ATTR_CONNECTION_DEAD)
-      (#.$sql_cd_true nil)
-      (#.$sql_cd_false t))))
 
 ;;;
 
-
-(defun %sql-set-pos (hstmt row option lock)
-  (with-error-handling 
-    (:hstmt hstmt)
-    (SQLSetPos hstmt row option lock)))
-
-(defun %sql-extended-fetch (hstmt fetch-type row)
-  (with-temporary-allocations 
-      ((row-count-ptr (cffi:foreign-alloc :unsigned-long))
-       (row-status-ptr (cffi:foreign-alloc :short)))
-    (with-error-handling (:hstmt hstmt)
-      (SQLExtendedFetch hstmt fetch-type row row-count-ptr
-			row-status-ptr)
-      (values (cffi:mem-ref row-count-ptr :unsigned-long)
-              (cffi:mem-ref row-status-ptr :short)))))
-
 ; column-nr is zero-based
 (defun %sql-get-data (hstmt column-nr c-type data-ptr precision out-len-ptr)
+  (declare (type (integer 0) column-nr))
   (with-error-handling
-    (:hstmt hstmt :print-info nil)
-    (SQLGetData hstmt (if (eq column-nr :bookmark) 0 (1+ column-nr))
-                c-type data-ptr precision out-len-ptr)))
+      (:hstmt hstmt :print-info nil)
+      (SQLGetData hstmt (if (eq column-nr :bookmark) 0 (1+ column-nr))
+                  c-type data-ptr precision out-len-ptr)))
 
 (defun %sql-get-data-raw (hstmt position c-type data-ptr buffer-length ind-ptr)
+  (declare (type (integer 0) position))
   (SQLGetData hstmt (1+ position)
               c-type data-ptr buffer-length ind-ptr))
 
@@ -726,7 +612,7 @@
 (defun %sql-put-data (hstmt data-ptr size)
   (with-error-handling
       (:hstmt hstmt :print-info t) ;; nil
-    (SQLPutData hstmt data-ptr size)))
+      (SQLPutData hstmt data-ptr size)))
 
 
 (defun %sql-more-results (hstmt)

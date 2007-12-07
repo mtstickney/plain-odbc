@@ -11,6 +11,7 @@
   (mysql-test3 con)
   (mysql-test4 con)
   (mysql-test5 con)
+  (mysql-test6 con)
   )
 
 (defparameter *mysql-type_test-ddl* "  
@@ -185,3 +186,29 @@ t_LONGTEXT longtext
                          (list (list string)))))))))
     (commit con)
     )
+
+
+(defun mysql-drop-test-proc (con proc)
+  (unless (zerop (caar (exec-query con (format nil 
+                                               "
+    select count(*) 
+    from information_schema.routines 
+    where routine_name ='~A'
+    and routine_schema='test'" proc))))
+    (exec-command con (format nil "drop procedure ~A" proc))))
+
+
+(defun mysql-test6 (con)
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+CREATE PROCEDURE test99 (in p1 int, out p2 INT)
+     BEGIN
+       set p2=p1+5;
+     END;")
+  (commit con)
+  (pprint
+  (let ((stm (prepare-statement con "{call test.test99(?,?)}" 
+                                '(:integer :in) 
+                                '(:integer :out))))
+    (assert (= 6 (first (exec-prepared-command stm 1))))
+    (free-statement stm)))

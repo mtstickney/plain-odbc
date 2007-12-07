@@ -11,6 +11,8 @@
 (defvar *default-access-dsn* "default-access-dsn")
 (defvar *default-oracle-dsn* "default-oracle-dsn")
 (defvar *default-sql-server-dsn* "default-sql-server-dsn")
+(defvar *default-mysql-dsn* "default-mysql-dsn")
+
 
 
 ;; fixme, do we need to quote the attributes with {}?
@@ -40,6 +42,11 @@
                      :server server
                      :Trusted_connection "YES"
                      )))
+
+(defun connect-mysql (server user password)
+  (connect-generic :dsn *default-mysql-dsn*
+                   :server server :uid user :pwd password))
+
 
 (defun with-prepared-statement-fun (con string params fun)
   (let ((stm (apply #'prepare-statement con string params)))

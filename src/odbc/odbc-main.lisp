@@ -454,14 +454,18 @@
               (let ((param (aref (slot-value query 'parameters) pos)))
                 (send-parameter-data param hstmt)))))))))
 
-;; this functions works only, since we store at 
-;; value-ptr the position of the parameter
-(defun sql-param-data-position (hstmt)  
-  (with-temporary-allocations 
+;; this functions works only, since we store at value-ptr the position
+;; of the parameter
+;; dso--
+(defun sql-param-data-position (hstmt)
+  (with-temporary-allocations
       ((ptr (cffi:foreign-alloc :pointer)))
-    (let ((res (with-error-handling (:hstmt hstmt) (%sql-param-data hstmt ptr))))
-      (values res (if (= res $SQL_NEED_DATA) 
-                    (cffi:mem-ref (cffi:mem-ref ptr :pointer) :long  ))))))
+    (let ((res (with-error-handling (:hstmt hstmt)
+                   (%sql-param-data hstmt ptr))))
+      (values res (if (= res $SQL_NEED_DATA)
+                      (cffi:mem-ref (cffi:mem-ref ptr :pointer) :int32))))))
+                                        ; TODO: The :int32 above
+                                        ; should probably be changed!
 
 (defmethod exec-prepared-query ((query prepared-statement) &rest parameters)
   (let ((hstmt (hstmt query)))

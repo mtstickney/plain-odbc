@@ -7,7 +7,7 @@
   (cffi:foreign-string-to-lisp ptr length nil))
 
 (defun get-string-nts (ptr)
-  (cffi:foreign-string-to-lisp ptr MOST-POSITIVE-FIXNUM  t))
+  (cffi:foreign-string-to-lisp ptr MOST-POSITIVE-FIXNUM t))
 
 (defun put-string (ptr vector)
   (cffi:lisp-string-to-foreign vector ptr (1+ (length vector))))

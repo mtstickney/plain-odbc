@@ -76,7 +76,7 @@
           (with-slots (buffer-length value-ptr ind-ptr c-type)
               column
             ;(setf value-ptr (cffi:foreign-alloc :long buffer-length))
-            (setf ind-ptr (cffi:foreign-alloc :long))
+            (setf ind-ptr (cffi:foreign-alloc 'sql-len))
             (%bind-column hstmt 
                           pos
                           c-type
@@ -112,11 +112,11 @@
           (cffi:foreign-alloc :char :count (slot-value column 'buffer-length))))
 
 (defmethod get-column-value ((column string-column))
-  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
     (if (= len $SQL_NULL_DATA)
-      nil
-      (progn
-        (get-string (slot-value column 'value-ptr) len))))) 
+        nil
+        (progn
+          (get-string (slot-value column 'value-ptr) len)))))
 ;;;-------------------
 ;;;   unicode-string
 ;;;------------------- 
@@ -146,13 +146,13 @@
           (cffi:foreign-alloc :uchar :count (slot-value column 'buffer-length))))
 
 (defmethod get-column-value ((column unicode-string-column))
-  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
     ;; len is size in bytes, not characters!
     (if (= len $SQL_NULL_DATA)
-      nil
-      (progn
-;        (break)
-        (wchar-bytes-to-string (get-byte-vector (slot-value column 'value-ptr) len))))))
+        nil
+        (progn
+          ;; (break)
+          (wchar-bytes-to-string (get-byte-vector (slot-value column 'value-ptr) len))))))
 
 
 
@@ -165,17 +165,17 @@
 (defmethod initialize-column ((column integer-column) args)
   (declare (ignore args))
   (setf (slot-value column 'c-type) $SQL_C_SLONG)
-  (setf (slot-value column 'buffer-length) 
-          (cffi:foreign-type-size :long))
-  (setf (slot-value column 'value-ptr) 
-          (cffi:foreign-alloc :long)))
+  (setf (slot-value column 'buffer-length)
+        (cffi:foreign-type-size 'sql-integer))
+  (setf (slot-value column 'value-ptr)
+        (cffi:foreign-alloc 'sql-integer)))
 
 
 (defmethod get-column-value ((column integer-column))
-  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
     (if (= len $SQL_NULL_DATA)
-      nil
-      (cffi:mem-ref (slot-value column 'value-ptr) :long))))
+        nil
+        (cffi:mem-ref (slot-value column 'value-ptr) 'sql-integer))))
 
 
 ;;;--------------------
@@ -192,13 +192,13 @@
   (setf (slot-value column 'value-ptr) (cffi:foreign-alloc :double)))
 
 (defmethod get-column-value ((column double-column))
-  ;(%get-long (slot-value column 'ind-ptr))
-  ;(%get-double-float (slot-value column 'value-ptr))
-   (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
-     (if (= len $SQL_NULL_DATA)
-       nil
-       (progn
-         (cffi:mem-ref (slot-value column 'value-ptr) :double)))))
+  ;; (%get-long (slot-value column 'ind-ptr))
+  ;; (%get-double-float (slot-value column 'value-ptr))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
+    (if (= len $SQL_NULL_DATA)
+        nil
+        (progn
+          (cffi:mem-ref (slot-value column 'value-ptr) :double)))))
 
 ;;;------------------------
 ;;; date column
@@ -213,11 +213,11 @@
   (setf (slot-value column 'value-ptr) (cffi:foreign-alloc :uchar :count 32)))
 
 (defmethod get-column-value ((column date-column))
-   (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
     (if (= len $SQL_NULL_DATA)
-      nil
-      (funcall *universal-time-to-date-dataype*
-               (timestamp-to-universal-time (slot-value column 'value-ptr))))))
+        nil
+        (funcall *universal-time-to-date-dataype*
+                 (timestamp-to-universal-time (slot-value column 'value-ptr))))))
 
 ;;;--------------------------
 ;;; binary column
@@ -240,7 +240,7 @@
 
 
 (defmethod get-column-value ((column binary-column))
-  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
     (if (= len $SQL_NULL_DATA) 
       nil
       (get-byte-vector (slot-value column 'value-ptr) len))))
@@ -259,10 +259,10 @@
   (setf (slot-value column 'value-ptr) (cffi:foreign-alloc :uchar :count 25)))
 
 (defmethod get-column-value ((column bigint-column))
-  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
-    (if (= len $SQL_NULL_DATA) 
-      nil
-      (parse-integer (get-string (slot-value column 'value-ptr) len)))))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
+    (if (= len $SQL_NULL_DATA)
+        nil
+        (parse-integer (get-string (slot-value column 'value-ptr) len)))))
 
 ;;;----------------------------
 ;;; decimal column
@@ -312,17 +312,17 @@
   (setf (slot-value column 'buffer-length) 50))
 
 (defmethod get-column-value ((column decimal-column))
-  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) :long)))
+  (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
     (if (= len $SQL_NULL_DATA) 
-      nil
-      (let ((bytes (get-byte-vector (slot-value column 'value-ptr) len))
-            (sum 0))
-        (dotimes (i 16)
-          (setf sum (+ (* 256 sum) (aref bytes (- (+ 3 16) 1 i)))))
-        (* 
-         sum
-         (if (zerop (aref bytes 2)) -1 1) ;sign
-         (expt 10 (- (aref bytes 1))))))))
+        nil
+        (let ((bytes (get-byte-vector (slot-value column 'value-ptr) len))
+              (sum 0))
+          (dotimes (i 16)
+            (setf sum (+ (* 256 sum) (aref bytes (- (+ 3 16) 1 i)))))
+          (* 
+           sum
+           (if (zerop (aref bytes 2)) -1 1) ;sign
+           (expt 10 (- (aref bytes 1))))))))
 
 
 
@@ -340,7 +340,7 @@
 (defmethod get-column-value ((column clob-column))
   (let* ((value-ptr (cffi:foreign-alloc :char 
                                         :count (slot-value column 'buffer-length)))
-         (ind-ptr (cffi:foreign-alloc :long)))
+         (ind-ptr (cffi:foreign-alloc 'sql-len)))
     (unwind-protect
       (get-character-data 
        (slot-value column 'hstmt)
@@ -364,7 +364,7 @@
 
 (defmethod get-column-value ((column uclob-column))
   (let* ((value-ptr (cffi:foreign-alloc :char :count (slot-value column 'buffer-length)))
-         (ind-ptr (cffi:foreign-alloc :long)))
+         (ind-ptr (cffi:foreign-alloc 'sql-len)))
     (unwind-protect
       (get-unicode-character-data 
        (slot-value column 'hstmt)
@@ -388,7 +388,7 @@
 
 (defmethod get-column-value ((column blob-column))
   (let* ((value-ptr (cffi:foreign-alloc  :uchar :count (slot-value column 'buffer-length)))
-         (ind-ptr (cffi:foreign-alloc :long)))
+         (ind-ptr (cffi:foreign-alloc 'sql-len)))
     (unwind-protect
       (get-binary-data 
        (slot-value column 'hstmt)
@@ -422,45 +422,47 @@
                                       buffer-length
                                       ind-ptr)))
       (handle-error sqlret)
-      (let ((len (cffi:mem-ref ind-ptr :long)))
-        ;(break)
+      (let ((len (cffi:mem-ref ind-ptr 'sql-len)))
+        ;;(break)
         (cond 
           ((= len $sql_null_data) nil)
-          ;; character data has a 0 byte appended, the length does not include it
-          ;; but it is taken into account when placing the data into the buffer
+          ;; character data has a 0 byte appended, the length does not
+          ;; include it but it is taken into account when placing the
+          ;; data into the buffer
           ((and (/= len $SQL_NO_TOTAL)
                 (<= (+ 1 len) buffer-length))
-            ;; the data fits into the buffer, return it
-            (get-string value-ptr len))
+           ;; the data fits into the buffer, return it
+           (get-string value-ptr len))
           
           ;; we have to fetch the data in several steps
           (t 
-            (let ((sos (make-string-output-stream)))
-              (loop
-                (if (and (= sqlret $SQL_SUCCESS_WITH_INFO)
-                         (equal (sql-state nil nil hstmt)
-                                "01004"))
+           (let ((sos (make-string-output-stream)))
+             (loop
+              (if (and (= sqlret $SQL_SUCCESS_WITH_INFO)
+                       (equal (sql-state nil nil hstmt)
+                              "01004"))
                   ;; an 0 byte is append to a string, ignore that
                   
                   (let ((str (get-string value-ptr (1- buffer-length))))
                     (write-string str sos)
                     (setf sqlret (%sql-get-data-raw hstmt
-                                            position
-                                            $SQL_C_CHAR
-                                            value-ptr
-                                            buffer-length
-                                            ind-ptr))
+                                                    position
+                                                    $SQL_C_CHAR
+                                                    value-ptr
+                                                    buffer-length
+                                                    ind-ptr))
                     (handle-error sqlret))
                   (return)))
-              ;; fetch the last part of the data
-          (setf len (cffi:mem-ref ind-ptr :long))
-          (let ((str (get-string value-ptr len)))
-            (write-string str sos))
-          (get-output-stream-string sos))))))))
+             ;; fetch the last part of the data
+             (setf len (cffi:mem-ref ind-ptr 'sql-len))
+             (let ((str (get-string value-ptr len)))
+               (write-string str sos))
+             (get-output-stream-string sos))))))))
 
 ;;; the version for 16bit unicode 
 
-(defun get-unicode-character-data (hstmt position value-ptr buffer-length ind-ptr)
+(defun get-unicode-character-data (hstmt position value-ptr buffer-length
+                                   ind-ptr)
   ;; local error handling, we can not use the general error handling
   ;; since this resets the sql-state
   ;; anyway the normal error handling would warn because of 
@@ -480,40 +482,42 @@
                                       buffer-length
                                       ind-ptr)))
       (handle-error sqlret)
-      (let ((len (cffi:mem-ref ind-ptr :long)))
+      (let ((len (cffi:mem-ref ind-ptr 'sql-len)))
         (cond 
           ((= len $sql_null_data) nil)
-          ;; character data has a 0 byte appended, the length does not include it
-          ;; but it is taken into account when placing the data into the buffer
+          ;; character data has a 0 byte appended, the length does not
+          ;; include it but it is taken into account when placing the
+          ;; data into the buffer
           ((and (/= len $SQL_NO_TOTAL)
                 (<= (+ 2 len) buffer-length))
-            ;; the data fits into the buffer, return it
-            (%get-unicode-string value-ptr len))
+           ;; the data fits into the buffer, return it
+           (%get-unicode-string value-ptr len))
           
           ;; we have to fetch the data in several steps
           (t 
-            (let ((sos (make-string-output-stream :element-type 'character)))
-              (loop
-                (if (and (= sqlret $SQL_SUCCESS_WITH_INFO)
-                         (equal (sql-state nil nil hstmt)
-                                "01004"))
+           (let ((sos (make-string-output-stream :element-type 'character)))
+             (loop
+              (if (and (= sqlret $SQL_SUCCESS_WITH_INFO)
+                       (equal (sql-state nil nil hstmt)
+                              "01004"))
                   ;; an 0 byte is append to a string, ignore that
                   
-                  (let ((str (%get-unicode-string value-ptr (- buffer-length 2))))
+                  (let ((str
+                         (%get-unicode-string value-ptr (- buffer-length 2))))
                     (write-string str sos)
                     (setf sqlret (%sql-get-data-raw hstmt
-                                            position
-                                            $SQL_C_WCHAR
-                                            value-ptr
-                                            buffer-length
-                                            ind-ptr))
+                                                    position
+                                                    $SQL_C_WCHAR
+                                                    value-ptr
+                                                    buffer-length
+                                                    ind-ptr))
                     (handle-error sqlret))
                   (return)))
-              ;; fetch the last part of the data
-          (setf len (cffi:mem-ref ind-ptr :long))
-          (let ((str (%get-unicode-string value-ptr len)))
-            (write-string str sos))
-          (get-output-stream-string sos))))))))
+             ;; fetch the last part of the data
+             (setf len (cffi:mem-ref ind-ptr 'sql-len))
+             (let ((str (%get-unicode-string value-ptr len)))
+               (write-string str sos))
+             (get-output-stream-string sos))))))))
     
 (defun get-binary-data (hstmt position value-ptr buffer-length ind-ptr)
   ;; local error handling, we can not use the general error handling
@@ -529,39 +533,40 @@
                (declare (ignore code2))
                (error condition)))))
  
-  (let* ((sqlret (%sql-get-data-raw hstmt
-                                    position
-                                    $SQL_C_BINARY
-                                    value-ptr
-                                    buffer-length
-                                    ind-ptr)))
-    (handle-error sqlret)
-    (let ((len (cffi:mem-ref ind-ptr :long)))
-      (if (= len $sql_null_data)
-        nil
-        (let ((res (make-array 0 :element-type '(unsigned-byte 8) :adjustable t))
-              (res-len 0))
-          (loop
-            (if (and (= sqlret $SQL_SUCCESS_WITH_INFO)
-                     (equal (sql-state nil nil hstmt)
-                          "01004"))
+    (let* ((sqlret (%sql-get-data-raw hstmt
+                                      position
+                                      $SQL_C_BINARY
+                                      value-ptr
+                                      buffer-length
+                                      ind-ptr)))
+      (handle-error sqlret)
+      (let ((len (cffi:mem-ref ind-ptr 'sql-len)))
+        (if (= len $sql_null_data)
+            nil
+            (let ((res (make-array 0
+                                   :element-type '(unsigned-byte 8)
+                                   :adjustable t))
+                  (res-len 0))
+              (loop
+               (if (and (= sqlret $SQL_SUCCESS_WITH_INFO)
+                        (equal (sql-state nil nil hstmt)
+                               "01004"))
             
-            (let ((vec (get-byte-vector value-ptr buffer-length)))
-              (setf res (adjust-array res (+ res-len buffer-length)))
-              (setf (subseq res res-len (+ res-len buffer-length)) vec)
-              (setf res-len (length res))
-              (setf sqlret (%sql-get-data-raw hstmt
-                                              position
-                                              $SQL_C_BINARY
-                                              value-ptr
-                                              buffer-length
-                                              ind-ptr))
-              (handle-error sqlret))
-            (return)))
+                   (let ((vec (get-byte-vector value-ptr buffer-length)))
+                     (setf res (adjust-array res (+ res-len buffer-length)))
+                     (setf (subseq res res-len (+ res-len buffer-length)) vec)
+                     (setf res-len (length res))
+                     (setf sqlret (%sql-get-data-raw hstmt
+                                                     position
+                                                     $SQL_C_BINARY
+                                                     value-ptr
+                                                     buffer-length
+                                                     ind-ptr))
+                     (handle-error sqlret))
+                   (return)))
         
-        (setf len (cffi:mem-ref ind-ptr :long))
-        (let ((vec (get-byte-vector value-ptr len)))
-          (setf res (adjust-array res (+ res-len len)))
-          (setf (subseq res res-len (+ res-len len)) vec))
-        res))))))
-
+              (setf len (cffi:mem-ref ind-ptr 'sql-len))
+              (let ((vec (get-byte-vector value-ptr len)))
+                (setf res (adjust-array res (+ res-len len)))
+                (setf (subseq res res-len (+ res-len len)) vec))
+              res))))))

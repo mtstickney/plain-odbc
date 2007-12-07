@@ -63,9 +63,10 @@ create table type_test (
   (let ((stm (prepare-statement 
               con "update type_test set t_blob=?,t_clob=? where id =1" 
               '(:blob :in) '(:clob :in))))
-  (exec-prepared-update stm 
-                         (make-array 10000 :element-type '(unsigned-byte 8) :initial-element 33)
-                         (make-string 100001 :initial-element #\o)))
+  (exec-prepared-update 
+   stm ;; sizes were 100000 and 100001
+   (make-array 100000 :element-type '(unsigned-byte 8) :initial-element 33)
+   (make-string 1000001 :initial-element #\o)))
   (commit con))
 
  
