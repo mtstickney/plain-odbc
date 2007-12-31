@@ -1,5 +1,10 @@
 ;;; -*- Mode: lisp -*-
 
+
+; to run these tests you need to use a schema/database with "use schema".
+
+
+
 (in-package :test-plain-odbc)
 
 (export '(run-mysql-tests))
@@ -11,7 +16,16 @@
   (mysql-test3 con)
   (mysql-test4 con)
   (mysql-test5 con)
-  (mysql-test6 con)
+  (mysql-test6a con)
+  (mysql-test6b con)
+  (mysql-test7 con)
+  (mysql-test9 con)
+  (mysql-test10 con)
+  (mysql-test15 con)
+  (mysql-test20 con)
+  (mysql-test22 con)
+  (mysql-test23 con)
+  (mysql-test23b con)
   )
 
 (defparameter *mysql-type_test-ddl* "  
@@ -197,7 +211,19 @@ t_LONGTEXT longtext
     and routine_schema='test'" proc))))
     (exec-command con (format nil "drop procedure ~A" proc))))
 
+(defun mysql-drop-test-table (con proc)
+  (unless (zerop (caar (exec-query con (format nil 
+                                               "
+    select count(*) 
+    from information_schema.tables 
+    where table_name ='~A'
+    and table_schema='test'" proc))))
+    (exec-command con (format nil "drop table ~A" proc))))
 
+
+
+
+;; this fails since myodbc can not deal with out parameters
 (defun mysql-test6 (con)
   (mysql-drop-test-proc con "test99")
   (exec-command con "
@@ -206,9 +232,216 @@ CREATE PROCEDURE test99 (in p1 int, out p2 INT)
        set p2=p1+5;
      END;")
   (commit con)
-  (pprint
   (let ((stm (prepare-statement con "{call test.test99(?,?)}" 
                                 '(:integer :in) 
                                 '(:integer :out))))
     (assert (= 6 (first (exec-prepared-command stm 1))))
     (free-statement stm)))
+
+
+(defun mysql-test6a (con)
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+CREATE PROCEDURE test99 (in p1 int, out p2 INT)
+     BEGIN
+       set p2=p1+5;
+     END;")
+  (commit con)
+  (plain-odbc:exec-command con "set @p2=1000")
+  (let ((stm (prepare-statement con "call test.test99(?,@p2)" 
+                                '(:integer :in))))
+    (exec-prepared-command stm 1) 
+    (assert (= 6 (first (first     (exec-query con "select cast(@p2 as signed)"))))) 
+    (free-statement stm)))
+
+(defun mysql-test6b (con)
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+CREATE PROCEDURE test99 (in p1 int, out p2 INT)
+     BEGIN
+       set p2=p1+5;
+     END;")
+  (commit con)
+  (plain-odbc:exec-command con "set @p2=1000")
+  (plain-odbc:exec-command con "set @p1=1")
+  (let ((stm (prepare-statement con "call test.test99(@p1,@p2)" )))
+    (exec-prepared-command stm) 
+    (assert (= 6 (first (first  (exec-query con "select cast(@p2 as signed)"))))) 
+    (free-statement stm)))
+
+(defun mysql-test7 (con)
+   (let ((*universal-time-to-date-dataype* 'universal-time-list)
+         (*date-datatype-to-universal-time* 'list-universal-time)
+         (*date-type-predicate* 'date-lisp-p))
+     (let ((res (exec-query con "select date_add(cast(? as date),interval 1 day)" 
+                            '((:date 2005 4 5) :date))))
+           (assert (equal res '(((:date 2005 4 6 0 0 0))))))))
+
+
+
+;;; 
+(defun mysql-test9 (con)
+  (ignore-errors 
+    (exec-command con "drop table test999"))
+  (exec-command con "create table test999 (a int,b LONGTEXT)")
+  (commit con)
+  (with-prepared-statement (stm con "insert into test999 (a,b) values(?,?)" 
+                                '(:integer :in) 
+                                '(:clob :in))
+    (let ((mp plain-odbc::*max-precision*))
+      (dolist (len (list 0 1 2 3 4 5 900 9000 8192 8000 
+                         (1- mp) 
+                         mp 
+                         (1+ mp)
+                         (* 2 mp)
+                         (1- (* 2 mp))
+                         (1+ (* 2 mp))))
+        (let ((string (make-funny-string len)))
+          (exec-prepared-update stm len string)
+          (let ((res (exec-query con (format nil "select b from test999 where a=~A" len))))
+            (assert (equal res
+                           (list (list string)))))))))
+    (exec-command con "drop table test999")
+    (commit con)
+    )
+
+
+(defun mysql-test10 (con)
+  (ignore-errors 
+    (exec-command con "drop table test999"))
+  (exec-command con "create table test999 (a int,b longblob)")
+  (commit con)
+  (with-prepared-statement (stm con "insert into test999 (a,b) values(?,?)" 
+                                '(:integer :in) 
+                                '(:blob :in))
+    (let ((mp plain-odbc::*max-precision*))
+      (dolist (len (list 0 1 2 3 4 5 900 9000 8192 8000 
+                         (1- mp) 
+                         mp 
+                         (1+ mp)
+                         (* 2 mp)
+                         (1- (* 2 mp))
+                         (1+ (* 2 mp)))) 
+        (let ((byte-vec (make-funny-bytes len)))
+          (exec-prepared-update stm len byte-vec)
+          (let ((res (exec-query con (format nil "select b from test999 where a=~A" len))))
+          (assert (equalp res
+                         (list (list byte-vec)))))))))
+    (exec-command con "drop table test999")
+    (commit con)
+    )
+
+
+(defun mysql-test15(con)
+  (let ((res (exec-query con "select (cast('2005-6-7 13:04:45' as datetime)) as a")))
+    (assert (= (encode-universal-time 45 4 13 7 6 2005) (caar res)))))
+
+
+(defun mysql-test20 (con)
+  (ignore-errors (exec-command con  "drop table type_test"))
+  (exec-command con *mysql-type_test-ddl*)
+  (dotimes (i 100)
+    (let* ((str (make-string 100 :initial-element #\p))
+           (binary (make-array 1000 :initial-element (random 256)))
+           (id (random 1000)))
+      (exec-update con "delete from type_test where id =?" id)
+      (exec-update con "insert into type_test (t_longblob,id,t_longtext) values(?,?,?)" 
+                   (list binary :blob) id (list str :clob))
+      (multiple-value-bind (r1 m1)
+          (exec-query con 
+                      "select id aaa,t_longblob bbb,t_longtext ccc from type_test where id=?"
+                      id)
+        (assert (equalp r1 (list (list id (coerce binary '(vector (unsigned-byte 8))) str))))
+        (assert (equal m1 '("aaa" "bbb" "ccc")))
+        (commit con)))))
+
+
+(defun mysql-test22 (con)
+  (let ((res (first 
+              (exec-query con "
+          select 
+           ? as t_double,
+           ? as t_integer,
+           ? as t_varchar,
+           cast(? as binary) as t_varbinary"
+                          1223455.334 12345 "blablablub" #(1 2 3 4)))))
+    (assert (equal 
+             '(1223455 12345 "blablablub" (1 2 3 4))
+             (list (truncate (first res))
+                   (second res)
+                   (third res)
+                   (coerce (fourth res) 'list))))))
+
+
+;; be carefull with double and float in lisp to!
+(defun mysql-test23 (con)
+  (mysql-drop-test-table con "testtab99")
+  (exec-command con "create table testtab99 (a double)")
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+   create procedure test99 (a double)
+    begin 
+    insert into testtab99 (a) values(a+1);
+    end;")
+  (with-prepared-statement 
+   (stm con "{call test99(?)}" 
+        '(:double :in))
+    (let ((nix (exec-prepared-command stm 1.8d0))
+          (nix2  (commit con))
+          (res (exec-query con "select * from testtab99")))
+      (assert (= (caar res) 2.8d0)))))
+
+(defun mysql-test23b (con)
+  (mysql-drop-test-table con "testtab99")
+  (exec-command con "create table testtab99 (a int)")
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+   create procedure test99 (a int)
+    begin 
+    insert into testtab99 (a) values(a+1);
+    end;")
+  (with-prepared-statement 
+   (stm con "{call test99(?)}" 
+        '(:integer :in))
+    (let ((nix (exec-prepared-command stm 7))
+          (res (exec-query con "select * from testtab99")))
+      (assert (= (caar res) 8)))))
+
+
+(defun mysql-test24 (con)
+  (mysql-drop-test-table con "testtab99")
+  (exec-command con "create table testtab99 (a decimal)")
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+   create procedure test99 (a decimal)
+    begin 
+    insert into testtab99 (a) values(a+1);
+    end;")
+  (with-prepared-statement 
+   (stm con "{call test99(?)}" 
+        '(:integer :in))
+    (let ((nix (exec-prepared-command stm 7))
+          (res (exec-query con "select * from testtab99")))
+      (assert (= (caar res) 8)))))
+
+
+(defun mysql-test25 (con)
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+   create procedure test99 (a decimal,b varchar(200))
+    begin 
+      select 3*a as a, 'x' + b +'y' as b, cast('2003-4-1' as datetime) as c;
+      select uuid() as x,cast(123456789012345678 as signed) as y,cast('abcdefghijklmnop' as binary) as z;
+    end;")
+  (with-prepared-statement 
+   (stm con "{call test99(?,?)}" 
+        '(:integer :in) '(:string :in))
+   (multiple-value-bind (r1 c1 r2 c2) (exec-prepared-query stm 123456789 "abcdefghijklmn")
+     
+     (assert (equal c1 '("a" "b" "c")))
+     (assert (equal c2 '("x" "y" "z")))
+     (assert (equal r1 (list (* 3.0d   123456789) "xabcdefghijklmny" 
+                             (encode-universal-time 0 0 0 1 4 2003))))
+     (assert (equal (rest r2 ) (list 123456789012345678 
+                                     (map vector 'char-code "abcdefghijklmn")))))))
+

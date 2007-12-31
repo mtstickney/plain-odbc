@@ -9,7 +9,9 @@
 
 (defpackage "PLAIN-ODBC"
   (:use 
-   "COMMON-LISP" #+mcl "CCL" #+cormanlisp "WIN32" "CFFI")
+   "COMMON-LISP"  "CFFI")
+;  rav, 20.12.2007 I do not think this is necessary anymore
+; #+mcl "CCL" #+cormanlisp "WIN32" "CFFI")
   (:export
    "EXEC-QUERY" 
    "EXEC-UPDATE" 
@@ -41,12 +43,17 @@
    "*DEFAULT-ACCESS-DSN*"
    "*DEFAULT-ORACLE-DSN*"
    "*DEFAULT-SQL-SERVER-DSN*"
+   "*DEFAULT-MYSQL-DSN*"
+
    
    "CONNECT-ACCESS"
    "CONNECT-SQL-SERVER"
    "CONNECT-ORACLE" 
+   "CONNECT-MYSQL"
 
    "TRACE-CONNECTION"
    "UNTRACE-CONNECTION"
+
+
 )) 
  

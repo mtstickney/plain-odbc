@@ -459,7 +459,7 @@ LIST-UNIVERSAL-TIME
       and <tt>exec-query</tt> is what is returned by these functions.
       One can execute a select statement with <tt>exec-update</tt> and 
       <tt>exec-command</tt>. But the command for <tt>exec-query</tt> 
-      muts return a resultset.
+      must return a resultset.
     </p>
     <P>
       <br><b>[Function]</b><br>
@@ -495,7 +495,8 @@ LIST-UNIVERSAL-TIME
       list of records in the resultset and as second value the names of the columns.
       The meta data of the result set is internally cached. If the meta data of the 
       result set changes with the invocations yo must use a new prepared statement.
-      This should not happen often, but it is possible.
+      This should not happen often, but it is possible. 
+      <b>Currently only the first resultset is returned!</b>
     </p>
     <p>
       <br><b>[Function]</b><br>

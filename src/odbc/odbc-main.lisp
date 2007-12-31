@@ -70,9 +70,12 @@
                ;; rav
                ;; for mysql/unoixodbc (get-odbc-info con $SQL_USER_NAME) core dumps
                ;; not known if this is mysql specific or unixodbc specific
-               (if (equalp dbms-name "MySQL")
-                 "unknown"
-                 (get-odbc-info con $SQL_USER_NAME))))
+             ;; rav, 20.12.2007 remove the check, it works with mysql 5.0 on windows
+               ;(if (equalp dbms-name "MySQL")
+               ;  "unknown"
+                 (get-odbc-info con $SQL_USER_NAME)
+               ;  )
+                 ))
              
        (when is-txn-capable
          (disable-autocommit (hdbc con)))

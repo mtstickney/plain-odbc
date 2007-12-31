@@ -139,4 +139,73 @@ The Microsoft driver coredumps earlier, namely when the sqlexec is executed.<br>
 Columns of type SQL_NULL_TYPE cause an error, the offending column has to be removed from the query.
 At least we prevent the coredump of the Oracle driver.<br>
 I am pretty sure that this is a driver bug, Microsoft Access coredumps as well in similar situations.
+
+
+<h4>MYSQL</h4>
+This is not one would expect!
+<pre>
+mysql> create view bla as select  date_add('2007-8-1',interval 1 day) as a;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> desc bla
+    -> ;
++-------+---------------+------+-----+---------+-------+
+| Field | Type          | Null | Key | Default | Extra |
++-------+---------------+------+-----+---------+-------+
+| a     | varbinary(29) | YES  |     | NULL    |       |
++-------+---------------+------+-----+---------+-------+
+1 row in set (0.00 sec)
+</pre>
+how to do it right:
+<pre>
+mysql> create view bla2 as select  date_add(cast('2007-8-1' as datetime),interval 1 day) as a;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> desc bla2;
++-------+----------+------+-----+---------+-------+
+| Field | Type     | Null | Key | Default | Extra |
++-------+----------+------+-----+---------+-------+
+| a     | datetime | YES  |     | NULL    |       |
++-------+----------+------+-----+---------+-------+
+1 row in set (0.00 sec)
+</pre>
+<p>
+Be carefull with variables, declared with something like 
+<tt>set @a =1</tt>. The types are automatically determined, and a type for
+dates does not exist.
+</p>
+<p>
+Of course error handling in MySQL is not existent, maybe I should change the
+server settings:
+<pre>
+mysql> select cast(cast('12345678901' as decimal) as char) as a, cast(cast('1234567890' as decimal) as char) as b;
++------------+------------+
+| a          | b          |
++------------+------------+
+| 9999999999 | 1234567890 |
++------------+------------+
+1 row in set, 1 warning (0.00 sec)
+</pre>
+<p>So there is no overflow error.</p>
+<p>
+Division by zero is handled, but only for an insert:
+<pre>
+mysql> set @a=1;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> set @b=0;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> select @a/@b;
++-------+
+| @a/@b |
++-------+
+|  NULL |
++-------+
+1 row in set, 1 warning (0.00 sec)
+
+mysql> insert into blu select @a/@b;
+ERROR 1365 (22012): Division by 0
+</pre>
+
 </html>
