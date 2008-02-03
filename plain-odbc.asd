@@ -8,7 +8,7 @@
                         ((:file "plain-odbc-package")
                          (:file "odbc-constants")
                          (:file "global")
-                         (:file "cffi-support")
+                         (:file "ffi-support")
                          (:file "odbc-ff-interface")
                          (:file "odbc-functions")
                          (:file "parameter")

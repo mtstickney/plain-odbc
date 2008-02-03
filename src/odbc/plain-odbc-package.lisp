@@ -13,10 +13,12 @@
 ;  rav, 20.12.2007 I do not think this is necessary anymore
 ; #+mcl "CCL" #+cormanlisp "WIN32" "CFFI")
   (:export
+   "EXEC-SQL"
    "EXEC-QUERY" 
    "EXEC-UPDATE" 
    "EXEC-COMMAND"
 
+   "EXEC-SQL*"
    "EXEC-QUERY*" 
    "EXEC-UPDATE*" 
    "EXEC-COMMAND*"
@@ -25,8 +27,8 @@
    "EXEC-PREPARED-QUERY" 
    "EXEC-PREPARED-UPDATE"
    "EXEC-PREPARED-COMMAND"
-   "FREE-STATEMENT"
-   "CONNECT"
+   "FREE-STATEMENT" 
+   "CONNECT"   
    ;"DRIVER-CONNECT"
    "CONNECT-GENERIC"
    "CLOSE-CONNECTION"

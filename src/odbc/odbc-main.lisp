@@ -105,7 +105,6 @@
       (driver-connect connection-string)))
 
 
-;;; fixme, is this correct?
 (defmethod print-object ((connection odbc-connection) s)
   (format s "#<~A SERVER=~S DBMS=~S USER=~S>"
           (class-name (class-of connection))
@@ -309,7 +308,7 @@
          (values obj :date :in)
          (error "not able to deduce parameter specification for ~A" obj)))))
 
-(defun exec-sql (connection sql parameter-list)
+(defun exec-sql-statement (connection sql parameter-list)
   (let ((query (make-query connection)))
     (unwind-protect
       (progn
@@ -357,9 +356,17 @@
         (free-query query)
         )))
 
+(defun exec-sql* (connection sql parameter-list)
+  (exec-sql-statement connection sql parameter-list))
+
+(defun exec-sql (connection sql &rest parameter-list)
+  (exec-sql* connection sql parameter-list))
+
+
+
 (defun exec-query* (connection sql parameter-list)
   (multiple-value-bind (rows result-sets out-params)
-      (exec-sql connection sql parameter-list)
+      (exec-sql-statement connection sql parameter-list)
     (declare (ignore rows) (ignore out-params))
     (let ((res nil))
       (dolist (result-set result-sets)
@@ -372,7 +379,7 @@
 
 (defun exec-update* (connection sql parameter-list)
   (multiple-value-bind (rows result-sets out-params)
-      (exec-sql connection sql parameter-list)
+      (exec-sql-statement connection sql parameter-list)
     (declare (ignore result-sets out-params))
     rows))
 
@@ -381,7 +388,7 @@
 
 (defun exec-command* (connection sql parameter-list)
   (multiple-value-bind (rows result-sets out-params)
-      (exec-sql connection sql parameter-list)
+      (exec-sql-statement connection sql parameter-list)
     (declare (ignore rows result-sets))
     (values-list out-params)))
 

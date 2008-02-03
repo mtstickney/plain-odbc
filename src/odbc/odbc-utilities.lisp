@@ -43,9 +43,14 @@
                      :Trusted_connection "YES"
                      )))
 
-(defun connect-mysql (server user password)
-  (connect-generic :dsn *default-mysql-dsn*
-                   :server server :uid user :pwd password))
+(defun connect-mysql (server database user password)
+  (apply 'connect-generic 
+         (append 
+          (list :dsn *default-mysql-dsn*
+                :server server :uid user :pwd password)
+          (if database (list :database database) ()) 
+         )))
+
 
 
 (defun with-prepared-statement-fun (con string params fun)

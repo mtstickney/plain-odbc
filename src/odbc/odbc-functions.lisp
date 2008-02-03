@@ -46,7 +46,7 @@
 
 ;; TODO: Why doesn't this use with-temporary-allocations? -dso
 (defun handle-error (henv hdbc hstmt)
-  (let
+  (with-temporary-allocations
       ((sql-state (alloc-chars 256))
        (error-message (alloc-chars #.$SQL_MAX_MESSAGE_LENGTH))
        (error-code (cffi:foreign-alloc 'sql-integer))
@@ -62,11 +62,6 @@
      (cffi:mem-ref msg-length 'sql-small-int)
      (cffi:mem-ref error-code 'sql-integer))))
 
-
-; test this: return a keyword for efficiency
-;; rav,
-;; problem: calling SQLError clears the error state
-;#+ignore
 (defun sql-state (henv hdbc hstmt)
   (with-temporary-allocations
       ((sql-state (cffi:foreign-alloc :char :count 256))
@@ -82,11 +77,8 @@
 ;;; instead of a big macro use a fucntion
 
 (defun error-handling-fun (result-code henv hdbc hstmt)
-  ;; *** is this a bug in allegro or in my code??
-  ;#+allegro (setf result-code (short-to-signed-short result-code))
-
   (case result-code 
-    (#.$SQL_SUCCESS (values result-code nil))
+    ((#.$SQL_SUCCESS #.$SQL_NO_DATA_FOUND) (values result-code nil))
     ((#.$SQL_SUCCESS_WITH_INFO #.$SQL_ERROR)
       (multiple-value-bind (error-message sql-state msg-length error-code)
           (handle-error (or henv (cffi:null-pointer))
@@ -101,23 +93,27 @@
                  :error-message error-message
                  :sql-state sql-state
                  :error-code error-code))))
-    
+    ; this can happen, using  a wrong handle
     (#.$SQL_INVALID_HANDLE
       (values result-code
               (make-condition 'sql-error :error-message "[ODBC error] Invalid handle")))
+    ;; maybe this should raise an error immediately
     (#.$SQL_STILL_EXECUTING
       (values result-code 
               (make-condition 'sql-error :error-message"[ODBC error] Still executing")))
-    (otherwise (values result-code nil))
+    (#.$SQL_NEED_DATA
+     (values result-code nil))
+
+    ;; rav: hope above are all result codes I know
+    (otherwise (error "unknown result of odbc execution: ~A" result-code))
     ))
 
 
 ;;; rav:
 ;;; but the remaining macro is still large
-#+ignore
-(defmacro with-error-handling ((&key henv hdbc hstmt (print-info t))
+
+(defmacro with-error-handling ((&key henv hdbc hstmt)
                                    odbc-call &body body)
-  (declare (ignore print-info))
   (let ((condition-var (gensym))
         (result-code (gensym)))
     `(multiple-value-bind (,result-code ,condition-var) 
@@ -126,43 +122,6 @@
         (warning (warn ,condition-var))
         (error (error ,condition-var)))
       ,result-code ,@body)))
-
-
-;;; rav:
-;; the original macro
-#-ignore 
-(defmacro with-error-handling ((&key henv hdbc hstmt (print-info t))
-                                   odbc-call &body body)
-  (let ((result-code (gensym)))
-    `(let ((,result-code ,odbc-call))
-       ;; *** is this a bug in allegro or in my code??
-       ;#+allegro (setf ,result-code (short-to-signed-short ,result-code))
-       (case ,result-code
-         (#.$SQL_SUCCESS
-          (progn ,result-code ,@body))
-         (#.$SQL_SUCCESS_WITH_INFO
-          (when ,print-info
-            (multiple-value-bind (error-message sql-state)
-                                 (handle-error (or ,henv (cffi:null-pointer))
-                                               (or ,hdbc (cffi:null-pointer))
-                                               (or ,hstmt (cffi:null-pointer)))
-              (warn "[ODBC info] ~a state: ~a"
-		    ,result-code error-message
-		    sql-state)))
-          (progn ,result-code ,@body))
-         (#.$SQL_INVALID_HANDLE
-          (error "[ODBC error] Invalid handle"))
-         (#.$SQL_STILL_EXECUTING
-          (error "[ODBC error] Still executing"))
-         (#.$SQL_ERROR
-          (multiple-value-bind (error-message sql-state)
-                               (handle-error (or ,henv (cffi:null-pointer))
-                                             (or ,hdbc (cffi:null-pointer))
-                                             (or ,hstmt (cffi:null-pointer)))
-            (error "[ODBC error] ~a; state: ~a" error-message sql-state)))
-         (otherwise
-           (progn ,result-code ,@body))
-         ))))
 
 
 (defun %new-environment-handle ()
@@ -195,20 +154,6 @@
      (unwind-protect
        (progn ,@body)
        (%free-statement ,hstmt :drop))))
-
-;;; rav: ignored
-#+ignore
-(defmacro %with-transaction ((henv hdbc) &body body)
-  (let ((successp (gensym)))
-    `(let ((,successp nil))
-       (unwind-protect
-         (prog1
-           (progn ,@body)
-           (setf ,successp t))
-         (with-error-handling (:henv ,henv :hdbc ,hdbc)
-           (SQLTransact 
-            ,henv ,hdbc 
-            (if ,successp $SQL_COMMIT $SQL_ROLLBACK)))))))
 
 ;; functional interface
 
@@ -594,7 +539,7 @@
 (defun %sql-get-data (hstmt column-nr c-type data-ptr precision out-len-ptr)
   (declare (type (integer 0) column-nr))
   (with-error-handling
-      (:hstmt hstmt :print-info nil)
+      (:hstmt hstmt)
       (SQLGetData hstmt (if (eq column-nr :bookmark) 0 (1+ column-nr))
                   c-type data-ptr precision out-len-ptr)))
 
@@ -605,13 +550,13 @@
 
 
 (defun %sql-param-data (hstmt param-ptr)
-  (with-error-handling (:hstmt hstmt :print-info t) ;; nil
+  (with-error-handling (:hstmt hstmt)
       (SQLParamData hstmt param-ptr)))
 
 
 (defun %sql-put-data (hstmt data-ptr size)
   (with-error-handling
-      (:hstmt hstmt :print-info t) ;; nil
+      (:hstmt hstmt )
       (SQLPutData hstmt data-ptr size)))
 
 

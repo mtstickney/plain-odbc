@@ -14,11 +14,11 @@
                  ora-test5 
                  ora-test6 
                  ora-test7 
-                 #+ignore  ;; unicode support does not work for oracle
                  ora-test8 
                  ora-test9 
                  ora-test10 
                  ora-test11 
+                 ora-test12
                  ))
     (pprint sym)
     (funcall sym con)))
@@ -38,44 +38,82 @@ create table type_test (
   t_integer integer,
   t_number number,
   t_char char(2000) ,
-  t_varchar varchar(4000),
+  t_varchar varchar2(4000),
+  t_nvarchar NVARCHAR2(200),
   t_date date,
   t_raw raw(2000),
   t_blob blob,
-  t_clob clob)
+  t_clob clob,
+  t_nclob nclob
+  )
 ")
 
-(defun oracle-type-test (con)
-  (if (not (zerop (caar (exec-query con "select count(*) from user_tables where table_name ='TYPE_TEST'")))) 
-    (exec-command con "drop table type_test"))
-  (exec-command con *oracle-type_test-ddl*)
-  (exec-update con "insert into type_test (id) values(1)")
-  (exec-update con "
-   update type_test set
-      t_integer= 123456789012345677989,
-      t_number = 1.0/3.0,
-      t_char=rpad('1',1999),
-      t_varchar =lpad('1',3999),
-      t_date = sysdate,
-      t_raw =hextoraw('11223344556677889900')
-    where id =1")
-  (exec-query con "select * from type_test")
-  (let ((stm (prepare-statement 
-              con "update type_test set t_blob=?,t_clob=? where id =1" 
-              '(:blob :in) '(:clob :in))))
-  (exec-prepared-update 
-   stm ;; sizes were 100000 and 100001
-   (make-array 100000 :element-type '(unsigned-byte 8) :initial-element 33)
-   (make-string 1000001 :initial-element #\o)))
-  (commit con))
 
- 
 
 (defun ora-drop-test-proc (con proc)
   (unless (zerop (caar (exec-query con (format nil "select count(*) 
     from user_objects where object_name='~A'" proc))))
     (exec-command con (format nil "drop procedure ~A" proc))))
 
+(defun ora-drop-test-table (con proc)
+  (unless (zerop (caar (exec-query con (format nil "select count(*) 
+    from user_objects where object_name='~A'" proc))))
+    (exec-command con (format nil "drop table ~A" proc))))
+
+
+(defun oracle-type-test (con)
+  (ora-drop-test-table con "TYPE_TEST")
+  (exec-command con *oracle-type_test-ddl*)
+  (exec-update con "insert into type_test (id) values(1)")
+  (exec-update con "
+   update type_test set
+      t_integer= 12345678901234,
+      t_number = 1.0/3.0,
+      t_char=rpad('1',1999),
+      t_varchar =lpad('1',39),
+      t_nvarchar = lpad(nchr(1234),200,nchr(1234)),
+      t_date = to_date('1.3.2005 12:23:14','dd.mm.yyyy hh24:mi:ss'),
+      t_raw =hextoraw('11223344556677889900')
+    where id =1")
+  (let ((stm (prepare-statement 
+              con "update type_test set t_blob=?,t_clob=?,t_nclob=? where id =1" 
+              '(:blob :in) '(:clob :in) '(:UNICODE-CLOB :in))))
+  (exec-prepared-update 
+   stm ;; sizes were 100000 and 100001
+   (make-array 100000 :element-type '(unsigned-byte 8) :initial-element 33)
+   (make-string 1000001 :initial-element #\o)
+   (make-string 1234567 :initial-element (code-char 3217))))
+  (let ((res (exec-query con "
+      select id,t_integer,t_number,t_char,t_varchar,t_date,t_raw, t_nvarchar from type_test where id=1")))
+    (assert (= (length res) 1))
+    (setf res (first res))
+    (assert (equal (nth 0 res) 1d0))
+    (assert (equal (nth 1 res) 12345678901234d0))
+    (assert (equal (nth 2 res) (/ 1d0 3)))
+    ;;  t_char is of type char and therefor has always length 2000, 
+    ;; although we inserted a string of length 1999
+    (assert (equal (nth 3 res) 
+                   (let ((a (make-string 2000 :initial-element #\space)))
+                     (setf (schar a 0) #\1)
+                     a)))
+    (assert (equal (nth 4 res) 
+                   (let ((a (make-string 39 :initial-element #\space)))
+                     (setf (schar a 38) #\1)
+                     a)))
+    (assert (equal (nth 5 res)
+                   (encode-universal-time 14 23 12 1 3 2005)))
+    (assert (equal (coerce (nth 6 res) 'list)
+                   '(#x11 #x22 #x33 #x44 #x55 #x66 #x77 #x88 #x99 #x00)))
+    (assert (equal (nth 7 res) (make-string 200 :initial-element (code-char 1234))))
+    (let ((a (caar (exec-query con "select t_blob from type_test where id =1"))))
+      (assert (equalp a (make-array 100000 :element-type '(unsigned-byte 8) :initial-element 33))))
+    (let ((b (caar (exec-query con "select t_clob from type_test where id=1"))))
+      (assert (equal b (make-string 1000001 :initial-element #\o))))
+
+    (let ((c (caar (exec-query con "select t_nclob from type_test where id=1"))))
+      (assert (equal c (make-string 1234567 :initial-element (code-char 3217))))))
+    
+  (commit con))
 
 (defun ora-test1 (con)
   (ora-drop-test-proc con "TEST99")
@@ -199,6 +237,7 @@ create table type_test (
 
 ;; works only with oracle 9 ?
 ;; this does not work. mybe with the oracle odbc driver?
+;; it works with oracle 10gr2
 (defun ora-test8 (con)
   (ignore-errors (exec-command con "drop table testtab99"))
   (exec-command con "create table testtab99 (id integer, txt nvarchar2(2000))")
@@ -207,7 +246,7 @@ create table type_test (
                                 '(:integer :in) '(:unicode-string :in))
     (exec-prepared-update stm 1 str))
   (let ((res (exec-query con "select txt from testtab99 where id =1")))
-    (assert (equal (list str) res)))))
+    (assert (equal (list str) (first res))))))
 
 
 (defun ora-test9(con)
@@ -243,4 +282,26 @@ create table type_test (
         (assert (equal res (list (list str "1234567890"))))))))
 
        
-
+(defun ora-test12 (con)
+  (ora-drop-test-proc con "TEST99")
+  (exec-command con  (fix13 "create procedure test99 (a in out nvarchar2 ,b in out nvarchar2) as
+        x  nvarchar2(1000);
+        begin x:=a; a:=b; b:=x; end;"))
+  (with-prepared-statement (stm con "{call test99(?,?)}" 
+                                '(:unicode-string :inout) 
+                                '(:unicode-string :inout))
+    (let ((str1 (make-funny-string 700  (coerce (list (code-char 2341) (code-char 2347) #\a) 'vector )  ))
+          (str2 (make-funny-string 900   (coerce (list (code-char 2341) (code-char 2347) #\a) 'vector ))))
+      
+      (let ((res (exec-prepared-command stm str1 str2)))
+        (assert (equal res (list str2 str1)))))))
+ 
+(defun ora-test13 (con)
+  (ora-drop-test-table con "TESTTAB99")
+  (exec-command con "create table testtab99 (x integer,y varchar2(200))")
+  (multiple-value-bind (rc res params)
+      ;; if columns x and y are set by triggers they can also be retrieved by this method
+      (exec-sql con "insert into testtab99 (x,y) values(?+12,?||'a') returning x,y into ?,?" 13 "a" '(nil :integer :out) '(nil :string :out) )
+    (assert (= rc 1))
+    (assert (equal res nil))
+    (assert (equal (list 25 "aa") params))))

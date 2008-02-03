@@ -10,23 +10,31 @@
 (export '(run-mysql-tests))
 
 (defun run-mysql-tests (con)
-  (make-mysql-type-test con)
-  (mysql-test1 con)
-  (mysql-test2 con)
-  (mysql-test3 con)
-  (mysql-test4 con)
-  (mysql-test5 con)
-  (mysql-test6a con)
-  (mysql-test6b con)
-  (mysql-test7 con)
-  (mysql-test9 con)
-  (mysql-test10 con)
-  (mysql-test15 con)
-  (mysql-test20 con)
-  (mysql-test22 con)
-  (mysql-test23 con)
-  (mysql-test23b con)
-  )
+  (dolist (sym '(
+                 mysql-type-test
+                 mysql-test1 
+                 mysql-test2 
+                 mysql-test3 
+                 mysql-test4 
+                 mysql-test5 
+                 mysql-test6a 
+                 mysql-test6b 
+                 mysql-test7 
+                 mysql-test9 
+                 mysql-test10 
+                 mysql-test15 
+                 mysql-test20 
+                 mysql-test22 
+                 mysql-test23 
+                 mysql-test23b 
+                 mysql-test24
+                 mysql-test25
+                 mysql-test26
+                 mysql-test27
+                 mysql-test28
+                 ))
+    (pprint sym)
+    (funcall sym con)))
 
 (defparameter *mysql-type_test-ddl* "  
 
@@ -37,8 +45,6 @@ t_SMALLINT  SMALLINT,
 t_MEDIUMINT mediumint,
 t_INT int,
 t_BIGINT bigint,
-t_float24 float(24),
-t_float53 float(53),
 t_float float,
 t_DOUBLE double,
 t_decimal40_20 DECIMAL(40,20) ,
@@ -63,7 +69,7 @@ t_LONGTEXT longtext
 
 )
 ")
-(defun make-mysql-type-test (con)
+(defun mysql-type-test (con)
   (ignore-errors (exec-command con "drop table type_test"))
   (exec-command con *mysql-type_test-ddl*)
   (exec-update con "insert into type_test (id) values(1)")
@@ -74,10 +80,8 @@ t_LONGTEXT longtext
    t_MEDIUMINT =256*256*127,
   t_INT =987,
   t_BIGINT =256*256*256*256 *256*256*256*127,
-  t_float24 =9.67,
-  t_float53 = 1.5/3.9,
-  t_float =1.0/7.0,
-  t_DOUBLE = 1.0/7.0,
+  t_float =1.0e0/7.0e0,
+  t_DOUBLE = 1.0e0/7.0e0,
   t_decimal40_20 = '12345678901234567890.1234567890123456789',
   t_dATE ='2004-6-25',
   t_DATETIME = '2004-5-13 13:56:34',
@@ -85,26 +89,32 @@ t_LONGTEXT longtext
   t_TIME 	= '12:56',
   t_YEAR 	=1967,
   T_char = 'abcdefghijkmlnop',
-  t_varchar = 'abcdefghijklmnopqrstuvw',
+  t_varchar = 'abcdefghijklmnopqrstuvw'
 /*  --  t_TINYBLOB = lpad('a',33000), 
   --  t_TINYTEXT lpad('a',33000),
   --  t_BLOB blob,
   --  t_TEXT text,
   --  t_MEDIUMBLOB mediumblob, 
   --  t_MEDIUMTEXT mediumtext, 
-  t_LONGBLOB longblob, */
-  t_LONGTEXT = lpad('a',33000,'x') 
+  --t_LONGBLOB longblob,
+  --t_LONGTEXT = lpad('a',33000,'x') 
   where id =1
 ")
   (commit con)
-  (let ((res (exec-query con "
+   (let ((stm (prepare-statement 
+              con "update type_test set t_longblob =?, t_longtext=? where id =1" 
+              '(:blob :in) '(:clob :in))))
+     (exec-prepared-update stm 
+                           (make-array 10000 :element-type '(unsigned-byte 8) 
+                                       :initial-element 33)
+                           (make-string 100001 :initial-element #\o)))
+   (commit con)
+   (let ((res (exec-query con "
     select t_tinyint,
            t_smallint,
            t_mediumint,
            t_int,
            t_bigint,
-           t_float24,
-           t_float53,
            t_float,
            t_double,
            t_decimal40_20,
@@ -114,19 +124,34 @@ t_LONGTEXT longtext
            t_year,
            t_char,
            t_varchar,
+           t_longblob,
            t_longtext
-        from type_test where id=1
-")))
-    ;(pprint res)
-    )
-  (let ((stm (prepare-statement 
-              con "update type_test set t_longblob =?, t_longtext=? where id =1" 
-              '(:blob :in) '(:clob :in))))
-    (exec-prepared-update stm 
-                          (make-array 10000 :element-type '(unsigned-byte 8) 
-                                      :initial-element 33)
-                          (make-string 100001 :initial-element #\o)))
-(commit con))
+        from type_test where id=1")))
+     (assert (= (length res) 1))
+     (setf res (first res))
+     (assert (equal (nth 0 res) 1))
+     (assert (equal (nth 1 res) 255))
+     (assert (equal (nth 2 res) (* 256 256 127)))
+     (assert (equal (nth 3 res) 987))
+     (assert (equal (nth 4 res) (* 256 256 256 256  256 256 256 127)))
+     ;; these are skipped since support for double in myslq is bad 
+     ;;(assert (equal (nth 5 res) (/  1 7.0)))
+     ;;(assert (equal (nth 6 res) (/  1 7d0)))
+     ;; skipped because we do not have decimal as a datatype
+     (assert (equal (nth 7 res) 12345678901234567890.1234567890123456789d0))
+     (assert (equal (nth 8 res) (encode-universal-time  0 0 0 25 6 2004)))
+     (assert (equal (nth 9 res) (encode-universal-time  34 56 13 13 5 2004)))
+     (assert (equal (nth 10 res)  "12:56:00"))
+     ;; year is returend as  SQL_SMALLINT
+     (assert (equal (nth 11 res)  1967))
+     (assert (equal (nth 12 res) "abcdefghijkmlnop"))
+     (assert (equal (nth 13 res) "abcdefghijklmnopqrstuvw"))
+     (assert (equal (coerce (nth 14 res) 'list) 
+                    (coerce (make-array 10000 :element-type '(unsigned-byte 8) 
+                                        :initial-element 33 :adjustable t) 'list)))
+     (assert (equal (nth 15 res) (make-string 100001 :initial-element #\o)))
+     ))
+
 
 
 (defun mysql-test1 (con)
@@ -174,7 +199,7 @@ t_LONGTEXT longtext
   (exec-update con "delete from type_test where id=99")
   (with-prepared-statement (stm con "insert into type_test (id,t_double) values(99,?)" 
                                 '(:double :in))
-    (exec-prepared-update stm 1.8))
+    (exec-prepared-update stm 1.8d0))
   (let ((res (exec-query con "select t_double+1 from type_test where id=99")))
     (assert (<= (abs (- (caar res) 2.8d0)) 1d-7))))
 
@@ -430,18 +455,94 @@ CREATE PROCEDURE test99 (in p1 int, out p2 INT)
   (exec-command con "
    create procedure test99 (a decimal,b varchar(200))
     begin 
-      select 3*a as a, 'x' + b +'y' as b, cast('2003-4-1' as datetime) as c;
+      select 3*a as a, concat('x' , b ,'y') as b, cast('2003-4-1' as datetime) as c;
       select uuid() as x,cast(123456789012345678 as signed) as y,cast('abcdefghijklmnop' as binary) as z;
     end;")
-  (with-prepared-statement 
-   (stm con "{call test99(?,?)}" 
-        '(:integer :in) '(:string :in))
-   (multiple-value-bind (r1 c1 r2 c2) (exec-prepared-query stm 123456789 "abcdefghijklmn")
+  (multiple-value-bind (r1 c1 r2 c2) (exec-query con "{call test99(?,?)" 123456789 "abcdefghijklmn")
      
      (assert (equal c1 '("a" "b" "c")))
      (assert (equal c2 '("x" "y" "z")))
-     (assert (equal r1 (list (* 3.0d   123456789) "xabcdefghijklmny" 
+     (assert (equal (first r1) (list (* 3.0d0   123456789) "xabcdefghijklmny" 
                              (encode-universal-time 0 0 0 1 4 2003))))
-     (assert (equal (rest r2 ) (list 123456789012345678 
-                                     (map vector 'char-code "abcdefghijklmn")))))))
+     (assert (equal (second (first r2 )) 123456789012345678 ))
+     (assert (equal (coerce (third (first r2)) 'list) (coerce (map 'vector 'char-code "abcdefghijklmnop") 'list)))))
 
+(defun mysql-test26 (con)
+  (mysql-drop-test-table con "testtab99")
+  (exec-command con "create table testtab99 (id int,bla varchar(200))")
+  (exec-update con "insert into testtab99 (id,bla) values(1,'bla1')")
+  (exec-update con "insert into testtab99 (id,bla) values(2,'bla2')")
+  (assert (equal (exec-update con "update testtab99 set bla=? where id=?" "bla100" 1) 1))
+  (assert (equal (exec-update con "update testtab99 set bla=? where id=?" "bla100" 99) 0))
+  (with-prepared-statement 
+   (stm con "update testtab99 set bla=? where id=?" :string :integer)
+   (assert (equal (exec-prepared-update stm  "bla100" 1) 1))
+   (assert (equal (exec-prepared-update stm  "bla100" 99) 0))
+  ))
+
+(defun mysql-test27 (con)
+  (mysql-drop-test-proc con "test99")
+  (exec-command con "
+    create procedure test99(a1 varchar(200),b1 int,c1 datetime) 
+    begin
+    declare a2 varchar(200);
+    declare b2 int;
+    declare c2 datetime;
+     set a2=concat(a1,'x');
+      set b2=b1+3;
+      set c2=c1+ interval 3 day;
+      select a2 as a2,b2 as b2, c2 as c2;
+    end;")
+  (let* ((the-date (encode-universal-time 12 3 5 12 11 2007))
+         (res (exec-query con "call test99(?,?,?)" "abc" 
+                          (list 12 :integer ) (list the-date :date)))
+         (row (first res)))
+    (assert (equal (first row) "abcx"))
+    (assert (equal (second row) 15))
+    (assert (equal (third row) (+ the-date (* 3 86400))))))
+
+(defun mysql-test28 (con)
+  (mysql-drop-test-proc con "test99")
+   (exec-command con "
+    create procedure test99(a1 varchar(200),b1 int,c1 datetime) 
+    begin
+    declare a2 varchar(200);
+    declare b2 int;
+    declare c2 datetime;
+     set a2=concat(a1,'x');
+      set b2=b1+3;
+      set c2=c1+ interval 3 day;
+      select a2 as \"a2\",b2 as \"b2\", c2 as \"c2\";
+      select c2 as \"c2\", b2 as \"b2\",a2 as \"a2\";
+
+    end;")
+   (let* ((the-date (encode-universal-time 12 3 5 12 11 2007)))
+     (multiple-value-bind (co resultsets params)
+         (exec-sql con "call test99(?,?,?)" "abc" 
+                   (list 12 :integer ) (list the-date :date))
+       (let* ((rs1 (first resultsets))
+              (rs2 (second resultsets))
+              (rows1 (first rs1))
+              (rows2 (first rs2))
+              (cols1 (second rs1))
+              (cols2 (second rs2))
+              (row1 (first rows1))
+              (row2 (first rows2)))
+         (assert (equal (first row1) "abcx"))
+         (assert (equal (second row1) 15))
+         (assert (equal (third row1) (+ the-date (* 3 86400))))
+
+         (assert (equal (third row2) "abcx"))
+         (assert (equal (second row2) 15))
+         (assert (equal (first row2) (+ the-date (* 3 86400))))
+         
+         (assert (equal cols1 (list "a2" "b2" "c2")))
+         (assert (equal cols2 (list "c2" "b2" "a2")))
+         )
+       )))
+
+
+
+  
+
+  

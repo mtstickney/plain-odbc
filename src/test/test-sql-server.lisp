@@ -468,7 +468,37 @@ CREATE TABLE [type_test] (
                    (coerce (fourth res) 'list))))))
 
 
+(defun ss-test23 (con)
+  (ss-drop-test-proc con "test99")
+  (exec-command con "
+     create procedure test99 
+     @p1 integer,
+     @p2 varchar(200),
+    @p3 int out,
+    @p4  varchar(2000) out as 
+   begin
+      set @p3=3*@p1;
+      set @p4='a'+ @p2 + '#'+ @p2 +'x'
+      select @p3 as a,@p4 as b;
+      select @p4 as bb,@p3 as aa;
+   end")
+  (let* ((teststr "abcdefghijklmnopqrstuvwxyz")
+        (testint 12345678)
+        (p4 (format nil "a~A#~Ax" teststr teststr))
+        (p3 (* 3 testint)))
+   (multiple-value-bind (c resultsets params)
+       (exec-sql con "{call test99 (?,?,?,?)}" 
+                 testint teststr '(nil :integer :out) '(nil :string :out))
+     (assert (equal params (list p3 p4)))
+     (let* ((res1 (first resultsets))
+            (res2 (second resultsets))
+            (row1 (first (first res1)))
+            (row2 (first (first res2))))
 
-    
-      
-              
+       (assert (equal row1 (list p3 p4)))
+       (assert (equal row2 (list p4 p3)))
+       (assert (equal (second res1) '("a" "b")))
+       (assert (equal (second res2) '("bb" "aa")))))))
+
+
+

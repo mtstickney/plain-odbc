@@ -1,10 +1,13 @@
-This system contains codefrom Paul Meurer, Joerg Hoehle and Roland Averkamp.
 
+This system contains code from Paul Meurer and Roland Averkamp.
+
+David Owen made the necessary adjustments to the code to 
+make it run on 64-bit Linux.
 
 This system contains code from Paul Meurer:
 the FFC system was written by him and also
-the the lower level parts of the system: 
-src/odbc/codbc-constants.lisp
+the lower level parts of the system: 
+src/odbc/odbc-constants.lisp
 src/odbc/odbc-ff-interface.lisp
 src/odbc/ odbc-functions.lisp
 (I removed code that I did not need.)
@@ -31,13 +34,6 @@ and this is his license
 
  This software is made available AS IS, and no warranty is made about 
  the software or its performance. 
-
-
-The uffi system is written by Goerg Hoehle
-this is the file src/uff-clisp/uffi.lisp
-And this is his license 
-(c) 2004-2005 Joerg Hoehle
-Copyright: Allegro's LispLGPL (LLGPL)
 
 
 The upper parts of the system are written by me (Roland Averkamp) 
