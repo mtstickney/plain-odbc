@@ -143,7 +143,7 @@ create table type_test (
   (let ((stm (prepare-statement con "{call TEST99(?,?)}" 
                                 '(:string :in) 
                                 '(:string :out))))
-    (let ((str "lölkälkäölkälhjajhgfsjgakjhgfjfjhgffdtrtreztr"))
+    (let ((str "lolkalkxylkzlhjajhgfsjgakjhgfjfjhgffdtrtreztr"))
       (assert (equal str (first (exec-prepared-command stm str))))
       (free-statement stm)))
   (commit con))

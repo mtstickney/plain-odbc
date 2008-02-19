@@ -304,6 +304,26 @@
         (get-byte-vector (slot-value param 'value-ptr) len))))
 
 
+
+;;; LOB parameters
+;;; lob parameters are handled differently, the buffer is not filled with the
+;;; parameters value but we send data at execution time.
+;;; This is done with the call:
+;;; (setf (cffi:mem-ref (slot-value param 'ind-ptr) 'sql-len)
+;;;              (%sql-len-data-at-exec (length value))))))
+;;; At execution time the result of %sql-execute or %sql-exec-direct
+;;; is $SQL_NEED_DATA. 
+;;; The next call to %sql-param-data gives the address of the data buffer 
+;;; of the needed bind parameter.
+;;; For the LOB parameters we store in this buffer the position of the
+;;; bind parameter. At execution time we get the buffer address of the
+;;; bind parameter. From this buffer we retrieve the parameter position
+;;; and so we know which parameter to send.
+;;; see functions exec-sql-statement and sql-param-data-position
+;;; in odbc-main.lisp
+;;; there is also the Microsoft documentation on SQLPutData, SQLParamData, 
+;;;  SQL_NEED_DATA  and etc.
+
 ;;;-----------------------
 ;;;    clob parameter
 ;;;-----------------------
@@ -315,7 +335,6 @@
 
 (defclass clob-parameter (lob-parameter) ())
 
-
 (defmethod initialize-parameter ((param clob-parameter) args)
   (declare (ignore args))
   (with-slots (value-type parameter-type buffer-length value-ptr
@@ -324,8 +343,8 @@
     (setf parameter-type $SQL_LONGVARCHAR)
     ;; the value-ptr will be needed to find the parameter,  
     ;; we store the position there
-    (setf buffer-length (cffi:foreign-type-size 'sql-pointer))
-    (setf value-ptr (cffi:foreign-alloc 'sql-pointer))))
+    (setf buffer-length (cffi:foreign-type-size :long))
+    (setf value-ptr (cffi:foreign-alloc :long))))
 
 (defmethod set-parameter-value ((param clob-parameter) value)
   (if (null value)
@@ -374,8 +393,8 @@
     (setf parameter-type $SQL_WLONGVARCHAR)
     ;; the value-ptr will be needed to find the parameter,  
     ;; we store the position there
-    (setf buffer-length (cffi:foreign-type-size 'sql-pointer))
-    (setf value-ptr (cffi:foreign-alloc 'sql-pointer))))
+    (setf buffer-length (cffi:foreign-type-size :long))
+    (setf value-ptr (cffi:foreign-alloc ':long))))
 
 (defmethod set-parameter-value ((param uclob-parameter) value)
   (if (null value)
@@ -383,7 +402,7 @@
             $SQL_NULL_DATA)
     (progn
       (setf (slot-value param 'temp-val) value)
-      (setf (cffi:mem-ref (slot-value param 'value-ptr) ':long)
+      (setf (cffi:mem-ref (slot-value param 'value-ptr) :long)
               (slot-value param 'position))
       (setf (cffi:mem-ref (slot-value param 'ind-ptr) 'sql-len)
                  (%sql-len-data-at-exec (* 2 (length value)))))))
@@ -423,8 +442,8 @@
     (setf parameter-type $SQL_LONGVARBINARY)
     ;; the value-ptr will be needed to find the parameter, 
     ;; we store the position there
-    (setf buffer-length (cffi:foreign-type-size 'sql-pointer))
-    (setf value-ptr (cffi:foreign-alloc 'sql-pointer)))
+    (setf buffer-length (cffi:foreign-type-size :long))
+    (setf value-ptr (cffi:foreign-alloc :long)))
 )
 
 (defmethod set-parameter-value ((param blob-parameter) value)

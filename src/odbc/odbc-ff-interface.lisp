@@ -312,6 +312,5 @@
      month
      year)))
 
-
-(defmacro %sql-len-data-at-exec (length)
-  `(- $SQL_LEN_DATA_AT_EXEC_OFFSET ,length))
+(defun %sql-len-data-at-exec (length)
+  (- $SQL_LEN_DATA_AT_EXEC_OFFSET length))

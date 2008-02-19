@@ -39,7 +39,7 @@
 (defparameter *mysql-type_test-ddl* "  
 
 create table type_test
-(id int,
+ (id int,
 t_TINYINT TINYINT,
 t_SMALLINT  SMALLINT,
 t_MEDIUMINT mediumint,
@@ -98,6 +98,7 @@ t_LONGTEXT longtext
   --  t_MEDIUMTEXT mediumtext, 
   --t_LONGBLOB longblob,
   --t_LONGTEXT = lpad('a',33000,'x') 
+*/
   where id =1
 ")
   (commit con)

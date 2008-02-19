@@ -244,7 +244,7 @@ CREATE TABLE [type_test] (
                             "select convert(nvarchar(20),?),convert(varchar(20),?)"
                             '(:string :in) 
                             '(:unicode-string :in))
-    (let* ((strings '("hjgkhgkzt65646&%2" "nnvfdsfsfz6tztﬂ0#="))
+    (let* ((strings '("hjgkhgkzt65646&%2" "nnvfdsfsfz6tztB0#="))
            (res (exec-prepared-query stm (first strings) (second strings))))
       (assert (equal res (list strings))))))
 

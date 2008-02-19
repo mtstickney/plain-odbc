@@ -280,7 +280,18 @@ MySQL> select 1e14/7e0,1e14/7e0-14285714285714;
 </pre>
 The decimal expansion of 1/7 is periodic, so the digits 0.285 are correct. Thus
 MySQL uses the precision of double, but does not return all digits.
+<p>
 
+<h3>The SQL Parser</h3>
+The <tt>/* ..*/</tt> comments do not have to be closed:
+<pre>
+19]> (exec-query *con3* "select 1 as a /*bla")
+
+((1)) ;
+("a")
+</pre>
+Maybe this depends on the version of MySQL or some system parameter.
+</p>
 <h3>Parameters</h3>
 <p>
 As mentioned in the documentation, MySQL does not support out and in/out 
