@@ -30,7 +30,7 @@
       and Allegro.
       On Linux it worked with CMUCL and MySQL. Since the interface to the ODBC library 
       is done with
-      CFFI, plain-odbc should still with on these platforms/systems.
+      CFFI, plain-odbc should still work on these platforms/systems.
       </p>
     <p>
       David Owen made the necessary changes to the code to make it run on 
@@ -484,7 +484,7 @@ mysql_free_result(result);<br>
     </p>
      <p>
       <br><b>[Function]</b><br>
-      <tt>exec-update*<i>connection sqlstring parameters</i></tt><br>
+      <tt>exec-update* <i>connection sqlstring parameters</i></tt><br>
       The same as <tt>exec-update</tt>, but the ODBC parameters are passed as a list.
     </p>
     <p>
@@ -496,7 +496,7 @@ mysql_free_result(result);<br>
       </p>
       <p>
       <br><b>[Function]</b><br>
-      <tt>exec-command*<i>connection sqlstring parameters</i></tt><br>
+      <tt>exec-command* <i>connection sqlstring parameters</i></tt><br>
       The same as <tt>exec-command</tt>, but the ODBC parameters are passed as a list.
       </p>
 
@@ -524,7 +524,7 @@ mysql_free_result(result);<br>
       </p>
     <p>
       <br><b>[Function]</b><br>
-          <tt>exec-sql*<i>connection sqlstring parameters</i></tt><br>
+          <tt>exec-sql* <i>connection sqlstring parameters</i></tt><br>
             The same as <tt>exec-sql</tt>, but the ODBC parameters are passed as a list.
     </p>
     
