@@ -203,20 +203,19 @@
       (push (slot-value (aref columns i) 'column-name) res))
     (nreverse res)))
 
-(defun bind-columns (query)
+(defun bind-columns (query columncount)
   (with-slots (hstmt 
                columns
                column-count) 
               query 
-    (let ((cc (result-columns-count hstmt)))
-      (when (zerop cc)
+      (when (zerop columncount)
         (error "can not bind columns, there is no result set"))
-      (setf column-count cc)
+      (setf column-count columncount)
       (setf columns (make-array column-count))
       (dotimes (pos column-count)
         ;; the columns are 0 based, at least here
         (let ((col (create-column hstmt pos)))
-          (setf (aref columns pos) col))))))
+          (setf (aref columns pos) col)))))
 
 (defun unbind-columns (query)
   (let ((columns (slot-value query 'columns))
@@ -343,14 +342,15 @@
         (let ((res-list nil)
               (row-count (result-rows-count (hstmt query))))
           (loop
-            (when (zerop (result-columns-count (hstmt query))) (return))
-            (bind-columns query)
+            (let ((column-count (result-columns-count (hstmt query))))
+            (when (zerop column-count) (return))
+            (bind-columns query column-count)
             (let ((res (fetch-query-results query ))
                   (names (coerce (column-names query) 'list)))
               (push (list res names) res-list)
               (unbind-columns query)
               (unless (%sql-more-results (hstmt query))
-                (return))))
+                (return)))))
           (let ((return-parameters (get-parameters query)))
             (values row-count (nreverse res-list) return-parameters))))
         (free-query query)
@@ -492,7 +492,7 @@
           (if (column-count query)
             (unless (= (column-count query) no-of-columns)
               (error "the number of columns has changed"))
-            (bind-columns query)))
+            (bind-columns query no-of-columns)))
         (values (fetch-query-results query)
                 (coerce (column-names query) 'list)))
     (%free-statement hstmt :close))))

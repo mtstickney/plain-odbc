@@ -113,9 +113,7 @@
            $SQL_NULL_DATA)
      (put-string (slot-value param 'value-ptr) ""))
     (t
-     (cffi:lisp-string-to-foreign value
-                                  (slot-value param 'value-ptr)
-                                  (1+ (length value)))
+     (put-string (slot-value param 'value-ptr) value)
      (setf (cffi:mem-ref (slot-value param 'ind-ptr) 'sql-len)
            (length value)))))
 

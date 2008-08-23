@@ -29,7 +29,11 @@
                  ss-test19 
                  ss-test20 
                  ss-test21 
-                 ss-test22))
+                 ss-test22
+                 ss-test23
+                 ss-test24
+                 ss-test25
+                 ss-test26))
     (pprint sym)
     (funcall sym con)))
 
@@ -499,6 +503,26 @@ CREATE TABLE [type_test] (
        (assert (equal row2 (list p4 p3)))
        (assert (equal (second res1) '("a" "b")))
        (assert (equal (second res2) '("bb" "aa")))))))
+
+
+(defun ss-test24 (con)
+  (dolist (x '(234 123 237))
+  (let ((res (exec-query con (format nil "select char(~A)as a" x))))
+    (assert (= x (char-code (char (first (first res)) 0)))))))
+
+(defun ss-test25 (con)
+  (dolist (x '(234 123 237))
+  (let ((res (exec-query con (format nil "select ascii('~A') as a" (code-char x)))))
+    (assert (= x (first (first res)))))))
+
+(defun ss-test26 (con)
+  (dolist (x '(234 123 237))
+    (let ((res (exec-query con "select ? as a" (string (code-char x)))))
+      (assert (= x (char-code (char (first (first res)) 0)))))))
+      
+  
+
+
 
 
 

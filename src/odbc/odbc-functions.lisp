@@ -96,11 +96,16 @@
     ; this can happen, using  a wrong handle
     (#.$SQL_INVALID_HANDLE
       (values result-code
-              (make-condition 'sql-error :error-message "[ODBC error] Invalid handle")))
+              (make-condition 'sql-error :error-message "[ODBC error] Invalid handle"
+                              :sql-state nil
+                              :error-code nil
+                              )))
     ;; maybe this should raise an error immediately
     (#.$SQL_STILL_EXECUTING
       (values result-code 
-              (make-condition 'sql-error :error-message"[ODBC error] Still executing")))
+              (make-condition 'sql-error :error-message"[ODBC error] Still executing"
+                              :sql-state nil
+                              :error-code nil)))
     (#.$SQL_NEED_DATA
      (values result-code nil))
 
@@ -166,7 +171,7 @@
            (:required $SQL_DRIVER_COMPLETE_REQUIRED)
            (:prompt $SQL_DRIVER_PROMPT)
            (:noprompt $SQL_DRIVER_NOPROMPT))))
-    (cffi:with-foreign-string (connection-str-ptr connection-string)
+    (with-foreign-string-alloc (connection-str-ptr connection-string)
       (with-temporary-allocations
           ((complete-connection-str-ptr (alloc-chars 1024))
            (length-ptr (cffi:foreign-alloc 'sql-small-int)))
@@ -413,7 +418,7 @@
 
 (defun %sql-exec-direct (sql hstmt henv hdbc)
   (declare (string sql))
-  (cffi:with-foreign-string (sql-ptr sql)
+  (with-foreign-string-alloc (sql-ptr sql)
     (with-error-handling
         (:hstmt hstmt :henv henv :hdbc hdbc)
         (SQLExecDirect hstmt sql-ptr $SQL_NTS))))
@@ -497,7 +502,7 @@
 
 (defun %sql-prepare (hstmt sql)
   (declare (string sql))
-  (cffi:with-foreign-string (sql-ptr sql)
+  (with-foreign-string-alloc (sql-ptr sql)
     (with-error-handling (:hstmt hstmt)
         (SQLPrepare hstmt sql-ptr $SQL_NTS))))
 
@@ -522,7 +527,7 @@
 
 (defun set-connection-attr-string (hdbc option val)
   (with-error-handling  (:hdbc hdbc)
-      (cffi:with-foreign-string (ptr val)
+      (with-foreign-string-alloc (ptr val)
         ;; TODO: Null-terminator with length?
         (SQLSetConnectAttr_string hdbc option ptr (length val)))))
 
