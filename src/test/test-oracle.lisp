@@ -89,7 +89,7 @@ create table type_test (
     (setf res (first res))
     (assert (equal (nth 0 res) 1d0))
     (assert (equal (nth 1 res) 12345678901234d0))
-    (assert (equal (nth 2 res) (/ 1d0 3)))
+    (assert (> 1d-15 (abs (- (nth 2 res) (/ 1d0 3)))))
     ;;  t_char is of type char and therefor has always length 2000, 
     ;; although we inserted a string of length 1999
     (assert (equal (nth 3 res) 

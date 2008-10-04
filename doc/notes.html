@@ -330,5 +330,63 @@ and can return more than one result set. One example, assume
 ("a2" "b2" "c2")
 [35]> 
 </pre>
+<h4> PostgreSQL </h4>
+<a href=http://sql-info.de/postgresql/postgres-gotchas.html>
+http://sql-info.de/postgresql/postgres-gotchas.html
+</a>
+<h5>BLOBS </h5>
+It seems that lobs are not supported.
+When executing an update with a BLOB I get:
+<pre>
+*** - 
+      ERROR: type "lo" does not exist;
+      Error while executing the query, error code 7, State: 42704.
+</pre>
+According to the documentation one has to run lo.sql from the contrib section.
+<h5> SQL Parser</h5>
+The parser is buggy.
+<pre>
+<![CDATA[
+[76]> (plain-odbc:exec-query *con* "select 'a' as a,? as b " 1213)
+
+(("a" 1213)) ;
+("a" "b")
+[77]> (plain-odbc:exec-query *con* "select 'a' as a,/* comment */ ? as b " 1213)
+
+(("a" 1213)) ;
+("a" "b")
+[78]> (plain-odbc:exec-query *con* "select 'a' as a,/* comment ? */ ? as b " 1213)
+
+*** - The # of binded parameters < the # of parameter markers, error code 32, State: 07002.
+The following restarts are available:
+ABORT          :R1      Abort main loop
+Break 1 [79]> 
+
+[80]> (plain-odbc:exec-query *con* "select 'a' as a,/* comment '?' */ ? as b " 1213)
+
+(("a" 1213)) ;
+("a" "b")
+
+]]>
+</pre>
+Maybe this the ODBC driver and not the database itself.
+
+
+<h5> PG SQL</h5>
+Creating a function like
+<pre>
+create function test99 ( a in integer ) returns void as $$
+    begin 
+    insert into testtab99 (a) values(a+1);
+    end; 
+   $$ language plpgsql;
+</pre>
+gives an error. PG Sql does not like that the name of the column is the
+same as the name of the parameter. This is a well known feature.
+<h5> Out Parameters </h5>
+Out parameter will be returned will normaly as out parameters. But the 
+function needs to have return type record and the return values are
+returned result set with just row.
+
 </body>
 </html>

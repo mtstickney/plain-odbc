@@ -30,6 +30,16 @@
   (and (list list)
        (eql :date (car list))))
 
+(defun lpad (str len)
+  (let ((l (length str)))
+    (if (>= l len) str
+      (concatenate 'string (make-string (- len l) :initial-element #\space) str))))
+
+(defun rpad (str len)
+  (let ((l (length str)))
+    (if (>= l len) str
+      (concatenate 'string str (make-string (- len l) :initial-element #\space)))))
+
 
 (defun list-universal-time (list)
   (assert  (date-lisp-p list) ())
@@ -41,8 +51,3 @@
    (or (third list) 1)
    (or (second list) 1)
    (or (first list) 1900)))
-
-
-(load (merge-pathnames "test-sql-server.lisp" *load-truename*))
-(load (merge-pathnames "test-oracle.lisp" *load-truename*))
-(load (merge-pathnames "test-mysql.lisp"  *load-truename*))
