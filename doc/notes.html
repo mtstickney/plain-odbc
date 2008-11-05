@@ -6,8 +6,8 @@
 <body>
     <h3>Notes</h3>
     <p> This documents contains some observations and pitfalls encountered 
-        when using different drivers and databases. 
-    </p>
+      when using different drivers and databases. Of course this list is not complete.
+      Also some of these problems might have vanished in the mean time. </p>
     <h4> driver-connect </h4>
     Using driver-connect one does not have to create an ODBC datasource for every 
     database one wants to use. The necessary parameters for the driver manager/driver 
@@ -20,7 +20,8 @@
         "Driver={Microsoft Access Driver (*.mdb)};DBQ=c:/temp/Copy of OMR TT Reports.mdb"
       <li> using an Oracle Driver "DRIVER=Oracle in oracl92;UID=SCOTT;PWD=tiger;server=ltrav1"
     </ul>
-    One way to get a connection string is to create a file dsn and have a look at its contants, note that userid and password are encrypted in this file,
+    One way to get a connection string is to create a file dsn and have a look at its contants, 
+    note that userid and password are encrypted in this file,
     
     
     <h4>Problems using the Jet driver on windows</h4>
@@ -202,7 +203,7 @@ how to do it right:
 MySQL> create view bla2 as select  date_add(cast('2007-8-1' as datetime),interval 1 day) as a;
 Query OK, 0 rows affected (0.00 sec)
 
-MySQL> desc bla2;
+MySQL&gt; desc bla2;
 +-------+----------+------+-----+---------+-------+
 | Field | Type     | Null | Key | Default | Extra |
 +-------+----------+------+-----+---------+-------+
@@ -306,7 +307,7 @@ The problem with variables on MySQL is that one can only set them. It is
 not possible to declare a datatype for them.
 Another option is to select the parameters directly in the stored procedure. 
 Thus instead of having out or in/out parameters, the procedure returns
-return values as a result set. Note that <tt>exec-query<tt> accepts parameters 
+return values as a result set. Note that <tt>exec-query</tt> accepts parameters 
 and can return more than one result set. One example, assume 
 <tt>*con*</tt> is a MySQL connection.
 <pre>
@@ -342,7 +343,8 @@ When executing an update with a BLOB I get:
       ERROR: type "lo" does not exist;
       Error while executing the query, error code 7, State: 42704.
 </pre>
-According to the documentation one has to run lo.sql from the contrib section.
+According to the documentation one has to run lo.sql from the contrib section. 
+Blobs Columns have to be declared as of type <tt>lo</tt>.
 <h5> SQL Parser</h5>
 The parser is buggy.
 <pre>
@@ -372,7 +374,7 @@ Break 1 [79]>
 Maybe this the ODBC driver and not the database itself.
 
 
-<h5> PG SQL</h5>
+<h5> PostgreSQL, 8.3</h5>
 Creating a function like
 <pre>
 create function test99 ( a in integer ) returns void as $$
@@ -384,9 +386,8 @@ create function test99 ( a in integer ) returns void as $$
 gives an error. PG Sql does not like that the name of the column is the
 same as the name of the parameter. This is a well known feature.
 <h5> Out Parameters </h5>
-Out parameter will be returned will normaly as out parameters. But the 
-function needs to have return type record and the return values are
-returned result set with just row.
-
+Out parameter will be returned as out parameters. But a function with 
+out parameters must have as a return type record and the return values are
+returned as a result set with just one row.
 </body>
 </html>
