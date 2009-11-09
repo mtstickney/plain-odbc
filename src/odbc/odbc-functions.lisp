@@ -21,6 +21,13 @@
                 allocs))))
 
 
+(defmacro with-foreign-string-allocations (specs &body body)  
+  (if (car specs)
+      `(with-foreign-string-alloc ,(car specs)
+	 (with-foreign-string-allocations ,(cdr specs) ,@body))
+      `(progn ,@body)))
+
+
 
 
 ;;; rav:
@@ -500,12 +507,81 @@
     (fetch-all-rows hstmt)))
 
 
+
 (defun %sql-prepare (hstmt sql)
   (declare (string sql))
   (with-foreign-string-alloc (sql-ptr sql)
     (with-error-handling (:hstmt hstmt)
         (SQLPrepare hstmt sql-ptr $SQL_NTS))))
 
+(defun %sql-primary-keys (hstmt catalog-name schema-name table-name)
+  
+  (with-foreign-string-allocations ((catalog-name-ptr (or catalog-name ""))
+                                    (schema-name-ptr (or schema-name ""))
+                                    (table-name-ptr (or table-name "")))
+     (with-error-handling (:hstmt hstmt)
+                          (SQLPrimaryKeys hstmt
+                                          (if catalog-name catalog-name-ptr nil)
+                                          $SQL_NTS
+                                          (if schema-name schema-name-ptr nil)
+                                          $SQL_NTS
+                                          (if table-name table-name-ptr nil)
+                                          $SQL_NTS))))
+  
+(defun %sql-columns (hdbc catalog-name schema-name table-name)
+  (with-statement-handle (hstmt hdbc) 
+    (let ((null-len 0))
+      (declare (type (integer 0) null-len))
+      (with-foreign-string-allocations ((catalog-name-ptr catalog-name)
+					(schema-name-ptr schema-name)
+					(table-name-ptr table-name))
+	(with-error-handling (:hstmt hstmt)
+	    (SQLColumns hstmt 
+			catalog-name-ptr $SQL_NTS
+			schema-name-ptr $SQL_NTS
+			table-name-ptr $SQL_NTS 
+			(cffi:null-pointer) null-len)))
+      (%fetch-all-rows hstmt))))
+
+(defun %fetch-all-rows (hstmt)
+  (labels ((%fetch-all-rows-1 (hstmt columns)
+	     (loop 
+		while (not (= (%sql-fetch hstmt) $SQL_NO_DATA_FOUND))
+		collect (get-row columns)
+		finally (free-all-columns columns))))
+    (let ((columns (%mk-columns hstmt)))
+      (if (not columns)
+	  -1
+	  (%fetch-all-rows-1 hstmt columns)))))
+  
+
+(defun free-all-columns (columns)
+  (loop 
+       for column in columns
+       do (with-slots (value-ptr ind-ptr) column
+	    (when value-ptr
+	      (cffi:foreign-free value-ptr))
+	    (when ind-ptr
+	      (cffi:foreign-free ind-ptr)))))
+
+
+(defun %mk-columns (hstmt)
+  "create a column list for hstmt's result set"
+  (let ((column-count (result-columns-count hstmt)))
+    (when (zerop column-count) (return-from %mk-columns -1))
+    (loop 
+       for pos from 0 to (1- column-count)
+       collect (create-column hstmt pos))))
+
+
+(defun get-row (columns)
+  (loop
+       for col in columns
+       collect (get-column-value col)))
+		    
+	   
+
+ 
 (defun set-connection-option (hdbc option param)
   (with-error-handling (:hdbc hdbc)
       (SQLSetConnectOption hdbc option param)))

@@ -394,7 +394,24 @@
 
 (defun exec-command (connection sql &rest parameter-list)
   (exec-command* connection sql parameter-list))
- 
+
+(defun get-primary-keys (connection catalog-name schema-name table-name)
+  (check-type catalog-name (or null string))
+  (check-type schema-name (or null string))
+  (check-type table-name (or null string))
+  (let ((query (make-query connection)))
+    (%sql-primary-keys (hstmt query) catalog-name schema-name table-name)
+    (let ((column-count (result-columns-count (hstmt query))))
+      (when (zerop column-count) 
+        (free-query query)
+        (return-from get-primary-keys nil))
+      (bind-columns query column-count)
+      (let ((res (fetch-query-results query))
+            (names (coerce (column-names query) 'list)))
+        (unbind-columns query)
+        (free-query query)
+        (values res names)))))
+
 
 (defmethod prepare-statement ((connection odbc-connection) sql &rest parameter-list)
   (with-slots (hdbc) connection
