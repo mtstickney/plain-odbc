@@ -103,6 +103,7 @@
      (*szSqlStr string-ptr)             ; UCHAR  FAR *szSqlStr
      (cbSqlStr sql-integer)))           ; SDWORD      cbSqlStr
 
+
 (defsqlfun "SQLColumns"
     ((hstmt sql-h-stmt)
      (CatalogName string-ptr)
@@ -123,6 +124,38 @@
      (schema-name-len sql-small-int)
      (table-name string-ptr)
      (table-name-len sql-small-int)))
+
+(defsqlfun "SQLTables"
+    ((hstmt sql-h-stmt)
+     (catalog-name string-ptr)
+     (catalog-name-len sql-small-int)
+
+     (schema-name string-ptr)
+     (schema-name-len sql-small-int)
+
+     (table-name string-ptr)
+     (table-name-len sql-small-int)
+
+     (table-type string-ptr)
+     (table-type-len sql-small-int)))
+
+(defsqlfun "SQLForeignKeys" 
+  ((hstmt sql-h-stmt)
+   (catalog-name1 string-ptr)
+   (catalog-name-len1 sql-small-int)
+   (schema-name1 string-ptr)
+   (schema-name-len1 sql-small-int)
+   (table-name1 string-ptr)
+   (table-name-len1 sql-small-int)
+
+   (catalog-name2 string-ptr)
+   (catalog-name-len2 sql-small-int)
+   (schema-name2 string-ptr)
+   (schema-name-len2 sql-small-int)
+   (table-name2 string-ptr)
+   (table-name-len2 sql-small-int)))
+
+
 
 
 

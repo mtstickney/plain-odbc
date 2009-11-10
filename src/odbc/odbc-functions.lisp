@@ -516,32 +516,81 @@
 
 (defun %sql-primary-keys (hstmt catalog-name schema-name table-name)
   
-  (with-foreign-string-allocations ((catalog-name-ptr (or catalog-name ""))
-                                    (schema-name-ptr (or schema-name ""))
-                                    (table-name-ptr (or table-name "")))
-     (with-error-handling (:hstmt hstmt)
-                          (SQLPrimaryKeys hstmt
-                                          (if catalog-name catalog-name-ptr nil)
-                                          $SQL_NTS
-                                          (if schema-name schema-name-ptr nil)
-                                          $SQL_NTS
-                                          (if table-name table-name-ptr nil)
-                                          $SQL_NTS))))
-  
-(defun %sql-columns (hdbc catalog-name schema-name table-name)
-  (with-statement-handle (hstmt hdbc) 
-    (let ((null-len 0))
-      (declare (type (integer 0) null-len))
-      (with-foreign-string-allocations ((catalog-name-ptr catalog-name)
-					(schema-name-ptr schema-name)
-					(table-name-ptr table-name))
-	(with-error-handling (:hstmt hstmt)
-	    (SQLColumns hstmt 
-			catalog-name-ptr $SQL_NTS
-			schema-name-ptr $SQL_NTS
-			table-name-ptr $SQL_NTS 
-			(cffi:null-pointer) null-len)))
-      (%fetch-all-rows hstmt))))
+  (with-foreign-string-allocations 
+   ((catalog-name-ptr (or catalog-name ""))
+    (schema-name-ptr (or schema-name ""))
+    (table-name-ptr (or table-name "")))
+   (with-error-handling (:hstmt hstmt)
+                        (SQLPrimaryKeys hstmt
+                                        (if catalog-name catalog-name-ptr (cffi:null-pointer))
+                                        $SQL_NTS
+                                        (if schema-name schema-name-ptr (cffi:null-pointer))
+                                        $SQL_NTS
+                                        (if table-name table-name-ptr (cffi:null-pointer))
+                                        $SQL_NTS))))
+
+(defun %sql-tables (hstmt catalog-name schema-name table-name table-type)
+   (with-foreign-string-allocations 
+    ((catalog-name-ptr (or catalog-name ""))
+     (schema-name-ptr (or schema-name ""))
+     (table-name-ptr (or table-name ""))
+     (table-type-ptr (or table-type "")))
+    (with-error-handling 
+     (:hstmt hstmt)
+     (SQLTables hstmt
+      (if catalog-name catalog-name-ptr (cffi:null-pointer))
+      $SQL_NTS
+      (if schema-name schema-name-ptr (cffi:null-pointer))
+      $SQL_NTS
+      (if table-name table-name-ptr (cffi:null-pointer))
+      $SQL_NTS
+      (if table-type table-type-ptr (cffi:null-pointer))
+      $SQL_NTS))))
+
+(defun %sql-foreign-keys (hstmt catalog-name1 schema-name1 table-name1 
+                                catalog-name2 schema-name2 table-name2)
+  (with-foreign-string-allocations 
+   ((catalog-name-ptr1 (or catalog-name1 ""))
+    (schema-name-ptr1 (or schema-name1 ""))
+    (table-name-ptr1 (or table-name1 ""))
+    
+    (catalog-name-ptr2 (or catalog-name2 ""))
+    (schema-name-ptr2 (or schema-name2 ""))
+    (table-name-ptr2 (or table-name2 "")))
+   
+   (with-error-handling (:hstmt hstmt)
+                        (SQLForeignKeys hstmt
+                                        (if catalog-name1 catalog-name-ptr1 (cffi:null-pointer))
+                                        $SQL_NTS
+                                        (if schema-name1 schema-name-ptr1 (cffi:null-pointer))
+                                        $SQL_NTS
+                                        (if table-name1 table-name-ptr1 (cffi:null-pointer))
+                                        $SQL_NTS
+                                        (if catalog-name2 catalog-name-ptr2 (cffi:null-pointer))
+                                        $SQL_NTS
+                                        (if schema-name2 schema-name-ptr2 (cffi:null-pointer))
+                                        $SQL_NTS
+                                        (if table-name2 table-name-ptr2 (cffi:null-pointer))
+                                        $SQL_NTS))))
+
+
+(defun %sql-columns (hstmt catalog-name schema-name table-name column-name)
+   (with-foreign-string-allocations 
+    ((catalog-name-ptr (or catalog-name ""))
+     (schema-name-ptr (or schema-name ""))
+     (table-name-ptr (or table-name ""))
+     (column-name-ptr (or column-name "")))
+    (with-error-handling 
+     (:hstmt hstmt)
+     (SQLColumns hstmt
+      (if catalog-name catalog-name-ptr (cffi:null-pointer))
+      $SQL_NTS
+      (if schema-name schema-name-ptr (cffi:null-pointer))
+      $SQL_NTS
+      (if table-name table-name-ptr (cffi:null-pointer))
+      $SQL_NTS
+      (if column-name column-name-ptr (cffi:null-pointer))
+      $SQL_NTS))))
 
 (defun %fetch-all-rows (hstmt)
   (labels ((%fetch-all-rows-1 (hstmt columns)

@@ -395,22 +395,59 @@
 (defun exec-command (connection sql &rest parameter-list)
   (exec-command* connection sql parameter-list))
 
+(defun call-metadata-func (connection fun) 
+  (let ((query (make-query connection)))
+    (unwind-protect 
+        (progn
+          (funcall fun (hstmt query))
+          (let ((column-count (result-columns-count (hstmt query))))
+            (when (zerop column-count) 
+              (return-from call-metadata-func nil))
+            (bind-columns query column-count)
+            (values (fetch-query-results query) (coerce (column-names query) 'list))))
+      (free-query query))))
+
 (defun get-primary-keys (connection catalog-name schema-name table-name)
   (check-type catalog-name (or null string))
   (check-type schema-name (or null string))
   (check-type table-name (or null string))
-  (let ((query (make-query connection)))
-    (%sql-primary-keys (hstmt query) catalog-name schema-name table-name)
-    (let ((column-count (result-columns-count (hstmt query))))
-      (when (zerop column-count) 
-        (free-query query)
-        (return-from get-primary-keys nil))
-      (bind-columns query column-count)
-      (let ((res (fetch-query-results query))
-            (names (coerce (column-names query) 'list)))
-        (unbind-columns query)
-        (free-query query)
-        (values res names)))))
+  (call-metadata-func connection
+   (lambda (hstmt)
+     (%sql-primary-keys hstmt catalog-name schema-name table-name))))
+
+(defun get-tables (connection catalog-name schema-name table-name table-type)
+  (check-type catalog-name (or null string))
+  (check-type schema-name (or null string))
+  (check-type table-name (or null string))
+  (check-type table-type (or null string))
+  (call-metadata-func connection
+   (lambda (hstmt)
+     (%sql-tables hstmt catalog-name schema-name table-name table-type))))
+
+(defun get-columns (connection catalog-name schema-name table-name column-name)
+  (check-type catalog-name (or null string))
+  (check-type schema-name (or null string))
+  (check-type table-name (or null string))
+  (check-type column-name (or null string))
+  (call-metadata-func connection
+   (lambda (hstmt)
+     (%sql-columns hstmt catalog-name schema-name table-name column-name))))
+
+(defun get-foreign-keys (connection 
+                         catalog-name1 schema-name1 table-name1
+                         catalog-name2 schema-name2 table-name2)
+  (check-type catalog-name1 (or null string))
+  (check-type schema-name1 (or null string))
+  (check-type table-name1 (or null string))
+  (check-type catalog-name2 (or null string))
+  (check-type schema-name2 (or null string))
+  (check-type table-name2 (or null string))
+  (call-metadata-func connection
+   (lambda (hstmt)
+     (%sql-foreign-keys hstmt 
+                        catalog-name1 schema-name1 table-name1
+                        catalog-name2 schema-name2 table-name2))))
+
 
 
 (defmethod prepare-statement ((connection odbc-connection) sql &rest parameter-list)
