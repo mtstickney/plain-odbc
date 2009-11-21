@@ -591,45 +591,6 @@
       $SQL_NTS
       (if column-name column-name-ptr (cffi:null-pointer))
       $SQL_NTS))))
-
-(defun %fetch-all-rows (hstmt)
-  (labels ((%fetch-all-rows-1 (hstmt columns)
-	     (loop 
-		while (not (= (%sql-fetch hstmt) $SQL_NO_DATA_FOUND))
-		collect (get-row columns)
-		finally (free-all-columns columns))))
-    (let ((columns (%mk-columns hstmt)))
-      (if (not columns)
-	  -1
-	  (%fetch-all-rows-1 hstmt columns)))))
-  
-
-(defun free-all-columns (columns)
-  (loop 
-       for column in columns
-       do (with-slots (value-ptr ind-ptr) column
-	    (when value-ptr
-	      (cffi:foreign-free value-ptr))
-	    (when ind-ptr
-	      (cffi:foreign-free ind-ptr)))))
-
-
-(defun %mk-columns (hstmt)
-  "create a column list for hstmt's result set"
-  (let ((column-count (result-columns-count hstmt)))
-    (when (zerop column-count) (return-from %mk-columns -1))
-    (loop 
-       for pos from 0 to (1- column-count)
-       collect (create-column hstmt pos))))
-
-
-(defun get-row (columns)
-  (loop
-       for col in columns
-       collect (get-column-value col)))
-		    
-	   
-
  
 (defun set-connection-option (hdbc option param)
   (with-error-handling (:hdbc hdbc)

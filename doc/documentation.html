@@ -1,6 +1,9 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
   <!-- -*- Mode: html -*- -->
+  <STYLE TYPE="text/css">
+    BODY {width: 80ex }
+   </STYLE>
   <head>
     <title>Plain-odbc Documentation</title>
   </head>
@@ -232,7 +235,13 @@ LIST-UNIVERSAL-TIME
       return parameters. A citation from the documentation of MySql:</b>
 </p>
       <p><em>
-For programs written in a language that provides a MySQL interface, there is no native method for directly retrieving the results of OUT or INOUT parameters from CALL statements. To get the parameter values, pass user-defined variables to the procedure in the CALL statement and then execute a SELECT statement to produce a result set containing the variable values. The following example illustrates the technique (without error checking) for a stored procedure p1 that has two OUT parameters. 
+For programs written in a language that provides a MySQL interface, there is no 
+native method for directly retrieving the results of OUT or INOUT parameters 
+from CALL statements. To get the parameter values, pass user-defined variables
+to the procedure in the CALL statement and then execute a SELECT statement
+to produce a result set containing the variable values.
+The following example illustrates the technique (without error checking) for 
+a stored procedure p1 that has two OUT parameters. 
 </em><tt><br>
 mysql_query(mysql, "CALL p1(@param1, @param2)");<br>
 mysql_query(mysql, "SELECT @param1, @param2");<br>
@@ -240,7 +249,6 @@ result = mysql_store_result(mysql);<br>
 row = mysql_fetch_row(result);<br>
 mysql_free_result(result);<br>
 </tt>
-
 
       </p>
 
@@ -567,10 +575,10 @@ mysql_free_result(result);<br>
     </p>
     <p>
       <br><b>[Function]</b><br>
-      <tt>exec-prepared-update <i>query &amp;rest parameters</i></tt><br>
-      Executes an update with the previoulsy created prepared statement 
-      <i>query</i> using the parameters in <i>parameters</i>. 
-      The return value is the number of affected records.
+          <tt>exec-prepared-update <i>query &amp;rest parameters</i></tt><br>
+            Executes an update with the previoulsy created prepared statement 
+            <i>query</i> using the parameters in <i>parameters</i>. 
+            The return value is the number of affected records.
     </p>
     <p>
       <br><b>[Function]</b><br>
@@ -580,6 +588,42 @@ mysql_free_result(result);<br>
       in the  <i>parameters</i>. The return value is the list values for
       the out and in/out parameters.
     </p>
+
+    <h3>Metadata</h3>
+    The following functions map directly to the ODBC-API metadata functions.
+    These are currently only tested for SQL-Server. For most databases it should also be
+    possible to retrieve the metadata from the data dictionary. Of course this not
+    portable. If the values for the parameters catalog and schema are empty then
+    they default to the current schema and catalog. 
+    On SQL-Server this is the database and the user (most times <tt>dbo</tt>).
+    All functions return a resultset like the function <tt>exec-query</tt>.
+    The first value is a list of a records, where each record is a list of lisp values.
+    The second value is the list of column names.
+    Consult the ODBC documentation for the columns of the resultset of each function.
+    <p>
+      <br><b>[Function]</b><br>
+          <tt> get-primary-keys<i>(con catalog schema table)</i></tt></br>
+      This is a wrapper for <tt>SQLPrimaryKeys</tt>. 
+    </p>
+
+    <p>
+      <br><b>[Function]</b><br>
+          <tt> get-tables<i>(con catalog schema table table-type)</i></tt></br>
+       This is a wrapper for <tt>SQLTables</tt>. 
+    </p>
+
+    <p>
+      <br><b>[Function]</b><br>
+          <tt> get-columns<i>(con catalog schema table column)</i></tt></br>
+         This is a wrapper for <tt>SQLColumns</tt>.
+    </p>
+    
+    <p>
+      <br><b>[Function]</b><br>
+          <tt> get-foreign-keys<i>(con catalog1 schema1 table1 catalog2 schema2 table2)</i></tt></br> 
+         This is a wrapper for <tt>SQLForeignKeys</tt>.
+    </p>
+
 
     <h3>Utilities</h3>
     <br><b>[Macro]</b><br>
