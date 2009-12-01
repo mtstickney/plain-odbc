@@ -51,3 +51,7 @@
    (or (third list) 1)
    (or (second list) 1)
    (or (first list) 1900)))
+
+(load (merge-pathnames "test-sql-server.lisp" *load-truename*))
+(load (merge-pathnames "test-oracle.lisp" *load-truename*))
+(load (merge-pathnames "test-mysql.lisp"  *load-truename*))
