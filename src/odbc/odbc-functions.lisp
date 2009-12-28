@@ -161,6 +161,13 @@
          (:unbind $SQL_UNBIND)
          (:reset $SQL_RESET_PARAMS)))))
 
+(defun %free-connection (hdbc)
+  (with-error-handling
+   (:hdbc hdbc)
+   (SQLFreeConnect hdbc)))
+
+
+
 (defmacro with-statement-handle ((hstmt hdbc) &body body)
   `(let ((,hstmt (%new-statement-handle ,hdbc)))
      (unwind-protect

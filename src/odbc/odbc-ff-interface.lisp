@@ -171,9 +171,11 @@
 
 
 (defsqlfun "SQLFreeStmt"
-    ((hstmt sql-h-stmt)                 ; HSTMT       hstmt
-     (fOption sql-u-small-int)))        ; UWORD       fOption
+  ((hstmt sql-h-stmt)                 ; HSTMT       hstmt
+   (fOption sql-u-small-int)))        ; UWORD       fOption
 
+(defsqlfun "SQLFreeConnect"
+  ((hdbc sql-h-dbc)))                 ; HDBC        hdbc
 
 
 (defsqlfun "SQLError"

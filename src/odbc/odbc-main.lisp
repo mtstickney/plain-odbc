@@ -131,6 +131,7 @@
     ;; anyway, a transaction must be explicitly commited
     (rollback con)
     (%disconnect (hdbc con))
+    (%free-connection (hdbc con))
     (SLOT-MAKUNBOUND con 'hdbc)
     (setf (slot-value con 'connected-p) nil)
     (setf *open-connections* (remove con *open-connections*))
