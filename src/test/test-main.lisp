@@ -8,7 +8,7 @@
 (in-package :test-plain-odbc)
 
 (defparameter *test-temp-dir*
-  #+(or mswindows win32) "c:/temp/"
+  #+(or mswindows win32 :windows) "c:/temp/"
   "/tmp/"
   )
 
@@ -55,3 +55,4 @@
 (load (merge-pathnames "test-sql-server.lisp" *load-truename*))
 (load (merge-pathnames "test-oracle.lisp" *load-truename*))
 (load (merge-pathnames "test-mysql.lisp"  *load-truename*))
+(load (merge-pathnames "test-sqlite.lisp"  *load-truename*))

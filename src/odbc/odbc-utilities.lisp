@@ -12,6 +12,7 @@
 (defvar *default-oracle-dsn* "default-oracle-dsn")
 (defvar *default-sql-server-dsn* "default-sql-server-dsn")
 (defvar *default-mysql-dsn* "default-mysql-dsn")
+(defvar *default-sqlite-dsn* "default-sqlite-dsn")
 
 
 
@@ -50,6 +51,9 @@
                 :server server :uid user :pwd password)
           (if database (list :database database) ()) 
          )))
+
+(defun connect-sqlite (filename) 
+  (CONNECT-GENERIC :dsn *default-sqlite-dsn* :database filename))
 
 
 

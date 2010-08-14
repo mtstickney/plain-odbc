@@ -58,8 +58,8 @@
        (error-message (alloc-chars #.$SQL_MAX_MESSAGE_LENGTH))
        (error-code (cffi:foreign-alloc 'sql-integer))
        (msg-length (cffi:foreign-alloc 'sql-small-int)))
-    (SQLError henv
-              hdbc
+    (SQLError (or henv (cffi:null-pointer))
+              (or hdbc (cffi:null-pointer))
               hstmt sql-state
               error-code error-message
               $SQL_MAX_MESSAGE_LENGTH msg-length)
@@ -75,8 +75,11 @@
        (error-message (cffi:foreign-alloc :char :count $SQL_MAX_MESSAGE_LENGTH))
        (error-code (cffi:foreign-alloc 'sql-integer))
        (msg-length (cffi:foreign-alloc 'sql-small-int)))
-    (SQLError henv hdbc hstmt sql-state error-code
-              error-message $SQL_MAX_MESSAGE_LENGTH msg-length)
+    (SQLError 
+     (or henv (cffi:null-pointer))
+     (or hdbc (cffi:null-pointer))
+     hstmt sql-state error-code
+     error-message $SQL_MAX_MESSAGE_LENGTH msg-length)
     (get-string sql-state 5)          ;(%cstring-to-keyword sql-state)
     ))
 

@@ -115,8 +115,14 @@
   (let ((len (cffi:mem-ref (slot-value column 'ind-ptr) 'sql-len)))
     (if (= len $SQL_NULL_DATA)
         nil
+      (progn 
+        ;;; sqlite odbc says length of resutl is larger than buffer
+        ;;; at least we should only try to retrive buffer size data
+        (when (> len (slot-value column 'column-size))
+          (warn "buffer smaller than indicated size of column value")
+          (setf len (slot-value column 'column-size)))
         (progn
-          (get-string (slot-value column 'value-ptr) len)))))
+          (get-string (slot-value column 'value-ptr) len))))))
 ;;;-------------------
 ;;;   unicode-string
 ;;;------------------- 

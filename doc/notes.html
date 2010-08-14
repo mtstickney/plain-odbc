@@ -389,5 +389,48 @@ same as the name of the parameter. This is a well known feature.
 Out parameter will be returned as out parameters. But a function with 
 out parameters must have as a return type record and the return values are
 returned as a result set with just one row.
+
+<h4>Sqlite</h4>
+<p>
+The following depends as usual very much on the ODBC driver. This driver is not written
+by the people who wrote Sqlite.
+</p>
+<p>
+Computed String columns are returnd as <tt>$SQL_VARCHAR</tt> of size 255.
+Of course this is not enough in many cases and data is truncated. 
+And the indicated size for the value in a specific row can be larger
+than 255.
+</p>
+<p>
+<pre>
+<![CDATA[
+[58]> (trace plain-odbc::column-info-to-class-and-args)
+....
+[61]> (plain-odbc:exec-command *con* "create table bla(a varchar(254),b varchar(255),c varchar(256))")
+
+
+[62]> (plain-odbc:exec-query *con* "select * from bla")
+
+1. Trace: (PLAIN-ODBC::COLUMN-INFO-TO-CLASS-AND-ARGS '12 '254 '0)
+1. Trace: PLAIN-ODBC::COLUMN-INFO-TO-CLASS-AND-ARGS ==> PLAIN-ODBC::STRING-COLUMN, NIL
+1. Trace: (PLAIN-ODBC::COLUMN-INFO-TO-CLASS-AND-ARGS '12 '255 '0)
+1. Trace: PLAIN-ODBC::COLUMN-INFO-TO-CLASS-AND-ARGS ==> PLAIN-ODBC::STRING-COLUMN, NIL
+1. Trace: (PLAIN-ODBC::COLUMN-INFO-TO-CLASS-AND-ARGS '-1 '256 '0)
+1. Trace: PLAIN-ODBC::COLUMN-INFO-TO-CLASS-AND-ARGS ==> PLAIN-ODBC::CLOB-COLUMN, NIL
+NIL ;
+("a" "b" "c")
+]]>
+</pre>
+</p>
+<p>
+So string columns which are larger than 255 are treated as <tt>SQL_LONGVARCHAR</tt>.
+It is possible to insert strings larger than column size into a 
+column. It is possible to retrieve the value via ODBC's <tt>sql_get_data_raw???</tt>. So for Sqlite one should always retrieve variable length values with this method.
+Mismatch between raw and text!
+<p>
+It seems <tt>blob</tt> columns are reported as <tt>SQL_BINARY</tt>.
+</p>
+</p>
+
 </body>
 </html>
