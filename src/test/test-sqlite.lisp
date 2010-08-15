@@ -163,3 +163,4 @@ create table type_test
         (assert (equalp r1 (list (list id (coerce binary '(vector (unsigned-byte 8))) str))))
         (assert (equal m1 '("aaa" "bbb" "ccc")))
         (commit con)))))
+

@@ -440,11 +440,19 @@ mysql_free_result(result);<br>
       <p>
         <br><b>[Function]</b><br>
             <tt>connect-mysql <i>server database user password</i></tt><br>
-         Connect to the MySql server on <i>server</i> connecting as user 
-        <i>user</i> with password <i>password</i>. The default database is
-       <i>database</i>. If database is <tt>NIL</tt> no database is chosen. 
-        The name of the template odbc datasource for this function is
-        <tt>default-mysql-dsn</tt>.
+              Connect to the MySql server on <i>server</i> connecting as user 
+              <i>user</i> with password <i>password</i>. The default database is
+              <i>database</i>. If database is <tt>NIL</tt> no database is chosen. 
+              The name of the template odbc datasource for this function is
+              <tt>default-mysql-dsn</tt>.
+      </p>
+
+      <p>
+        <br><b>[Function]</b><br>
+            <tt>connect-sqlite <i>databasefile</i></tt><br>
+              Open the Sqlite database with filename <i>databasefile</i>.
+              <tt>default-sqlite-dsn</tt>.
+              The <i>databasefile</i> must already exist.
       </p>
 
     <h3>Working with Connections</h3>
@@ -596,6 +604,8 @@ mysql_free_result(result);<br>
     portable. If the values for the parameters catalog and schema are empty then
     they default to the current schema and catalog. 
     On SQL-Server this is the database and the user (most times <tt>dbo</tt>).
+    It seems that on Oracle the first <i>catalog</i> argument has to be <tt>nil</tt>.
+    Of course this depends on the ODBC Driver.
     All functions return a resultset like the function <tt>exec-query</tt>.
     The first value is a list of a records, where each record is a list of lisp values.
     The second value is the list of column names.
