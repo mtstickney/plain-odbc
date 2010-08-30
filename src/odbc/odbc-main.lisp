@@ -27,8 +27,10 @@
    (dbms-name :reader dbms-name)
    (user-name :reader user-name)
    ;; info returned from SQLGetInfo
-   (info :initform (make-hash-table) :reader db-info))
-  #+cormanlisp (:metaclass cl::class-slot-class))
+   (info :initform (make-hash-table) :reader db-info)
+   (use-bind :initform t :accessor use-bind-column))
+  #+cormanlisp (:metaclass cl::class-slot-class)
+  )
 
 (defun get-odbc-info (con info-type)
   (with-slots (hdbc info) con
@@ -167,7 +169,11 @@
    (hstmt :initform nil :initarg :hstmt :accessor hstmt) ; = cursor??
    (columns :initform nil)
    (column-count :initform nil :accessor column-count)
-   (parameters :initarg :parameters :accessor parameters)))
+   (parameters :initarg :parameters :accessor parameters)
+   (use-bind :initform t :initarg :use-bind)))
+
+(defun use-bind-p (q)
+  (slot-value q 'use-bind))
 
 (defun make-query (con)
   (let ((new-query (make-instance 'odbc-query
@@ -175,7 +181,8 @@
                                   :active-p nil
                                   ;; column-count should be nil
                                   ;;(clone-database database)
-                                  :active-p t)))
+                                  :active-p t
+                                  :use-bind (slot-value con 'use-bind))))
    (setf (hstmt new-query) (%new-statement-handle (hdbc con)))
    new-query))
 
@@ -190,7 +197,8 @@
                                   :active-p nil
                                   ;; column-count should be nil
                                   ;;(clone-database database)
-                                  :active-p t)))
+                                  :active-p t
+                                  :use-bind (slot-value con 'use-bind))))
    (setf (hstmt new-query) (%new-statement-handle (hdbc con)))
    new-query))
 
@@ -215,7 +223,7 @@
       (setf columns (make-array column-count))
       (dotimes (pos column-count)
         ;; the columns are 0 based, at least here
-        (let ((col (create-column hstmt pos)))
+        (let ((col (create-column query pos (use-bind-p query))))
           (setf (aref columns pos) col)))))
 
 (defun unbind-columns (query)

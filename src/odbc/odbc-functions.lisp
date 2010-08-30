@@ -641,7 +641,7 @@
   (declare (type (integer 0) column-nr))
   (with-error-handling
       (:hstmt hstmt)
-      (SQLGetData hstmt (if (eq column-nr :bookmark) 0 (1+ column-nr))
+      (SQLGetData hstmt (1+ column-nr)
                   c-type data-ptr precision out-len-ptr)))
 
 (defun %sql-get-data-raw (hstmt position c-type data-ptr buffer-length ind-ptr)

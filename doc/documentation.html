@@ -456,11 +456,21 @@ mysql_free_result(result);<br>
       </p>
 
     <h3>Working with Connections</h3>
-    <p>
+      <p>
+        <br/><b>[Function]</b><br/>
+            <tt>use-bind-column <i>connection</i></tt></br>
+          <tt>setf (use-bind-column <i>connection</i>) <i>boolean</i></tt><br/>
+            With ODBC it is possible to retrieve data from a query in two ways: bind a column directly
+            or use the function SQLGetData. This property determines which method is used.
+            The default value is <tt>t</tt>. It can be changed anytime, this affects only queries 
+            that will be executed in the future. Usually the default value is fine. 
+            But SQLite (or its ODBC driver) has some quirks. For more Information see the 
+            ODBC documentation on SQLGetData.
+      </p>
       <br><b>[Function]</b><br>
       <tt>exec-query <i>connection sqlstring &amp;rest parameters</i></tt><br>
-      Execute a query, a command which returns a resultset 
-      (or several resultsets).
+            Execute a query, a command which returns a resultset 
+            (or several resultsets).
       <i> connection</i> is the odbc connection on which the command is 
       executed.
       <i>sqlstring</i> is the command text. 
