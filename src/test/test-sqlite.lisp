@@ -8,17 +8,25 @@
 (export '(run-sqlite-tests))
 
 (defun run-sqlite-tests (con)
-  (dolist (sym '(
-                 sqlite-type-test
-                 sqlite-test1
-                 sqlite-test2
-                 sqlite-test4
-                 sqlite-test5
-                 sqlite-test10 
-                 sqlite-test20 
-                 ))
-    (pprint sym)
-    (funcall sym con)))
+  (flet ((doit () 
+           (dolist (sym '(
+                          sqlite-type-test
+                          sqlite-test1
+                          sqlite-test2
+                          sqlite-test4
+                          sqlite-test5
+                          sqlite-test10 
+                          sqlite-test20 
+                          ))
+             (pprint sym)
+             (funcall sym con))))
+    (format t "with use-bind~%")
+    (setf (use-bind-column con) t)
+    (doit)
+    (format t "~%~%no use-bind~%")
+    (setf (use-bind-column con) nil)
+    (doit)
+    ))
 
 
 (defparameter *sqlite-type_test-ddl* "
@@ -127,15 +135,16 @@ create table type_test
   (with-prepared-statement (stm con "insert into test999 (a,b) values(?,?)" 
                                 '(:integer :in) 
                                 '(:blob :in))
-    (let ((mp plain-odbc::*max-precision*))
-      (dolist (len (list 0 1 2 3 4 5 900 9000 8192 8000 
+    (let* ((mp plain-odbc::*max-precision*)
+          (l1 (list 0 1 2 3 4 5 900 9000 8192 8000 
                          (1- mp) 
-                         mp 
-                         ;(1+ mp)
-                         ;(* 2 mp)
-                         ;(1- (* 2 mp))
-                         ;(1+ (* 2 mp))
-                         )) 
+                         mp ))
+          (l2 (list (1+ mp)
+                    (* 2 mp)
+                    (1- (* 2 mp))
+                    (1+ (* 2 mp)))))
+      ;; this is why use USE-BIND-COLUMN
+      (dolist (len (append l1 (if (use-bind-column con) nil l2)))
         (let ((byte-vec (make-funny-bytes len)))
           (exec-prepared-update stm len byte-vec)
           (let ((res (exec-query con (format nil "select b from test999 where a=~A" len))))

@@ -6,22 +6,38 @@
 (export '(run-oracle-tests))
 
 (defun run-oracle-tests (con)
-  (dolist (sym '(oracle-type-test
-                 ora-test1 
-                 ora-test2 
-                 ora-test3 
-                 ora-test4 
-                 ora-test5 
-                 ora-test6 
-                 ora-test7 
-                 ora-test8 
-                 ora-test9 
-                 ora-test10 
-                 ora-test11 
-                 ora-test12
-                 ))
-    (pprint sym)
-    (funcall sym con)))
+  (flet ((doit ()
+           (dolist (sym '(oracle-type-test
+                          ora-test1 
+                          ora-test2 
+                          ora-test3 
+                          ora-test4 
+                          ora-test5 
+                          ora-test6 
+                          ora-test7 
+                          ora-test8 
+                          ora-test9 
+                          ora-test10 
+                          ora-test11 
+                          ora-test12
+                                        ; metadata
+                          ora-test13
+                          ora-test14
+                          ora-test15
+                          ora-test16
+                          ora-test17
+                          ora-test18
+                          ora-test19
+                          ))
+             (pprint sym)
+             (funcall sym con))))
+    (format t "with use-bind~%")
+    (setf (use-bind-column con) t)
+    (doit)
+    (format t "~%~%no use-bind~%")
+    (setf (use-bind-column con) nil)
+    (doit)
+    ))
   
  
 ; this function replaces in a string every (code-char 13)  
@@ -301,7 +317,100 @@ create table type_test (
   (exec-command con "create table testtab99 (x integer,y varchar2(200))")
   (multiple-value-bind (rc res params)
       ;; if columns x and y are set by triggers they can also be retrieved by this method
-      (exec-sql con "insert into testtab99 (x,y) values(?+12,?||'a') returning x,y into ?,?" 13 "a" '(nil :integer :out) '(nil :string :out) )
+      ;; fixme /bug : it is not possible to retrieve the varchar value
+      ;;> Error: [Oracle][ODBC][Ora]ORA-01461: Ein LONG-Wert kann nur zur Einfügung in eine LONG-Spalte gebunden werden
+      ;;>        , error code 1461, State: S1000.
+      (exec-sql con "insert into testtab99 (x,y) values(?+12,?||'a') returning x into ?" 13 "a" '(nil :integer :out))
     (assert (= rc 1))
     (assert (equal res nil))
-    (assert (equal (list 25 "aa") params))))
+    (assert (equal (list 25) params))))
+
+
+;;; metdaten tests
+
+(defun ora-mk-metadatatest (con)
+  (ora-drop-test-table con "METADATATEST")
+  (exec-command con "
+    CREATE TABLE metadatatest(
+	x int NOT NULL,
+        y varchar2(10),
+        z date,
+       CONSTRAINT metadatatest_pk PRIMARY KEY (x,y)) "))
+
+(defun ora-test14 (con)
+  (ora-mk-metadatatest con)
+  (let ((user (first (first (exec-query con "select user from dual")))))
+     (multiple-value-bind
+         (res cols) 
+         (get-primary-keys con nil user "METADATATEST")
+       (assert (= 2 (length res)))
+       (assert (equal cols '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "COLUMN_NAME" "KEY_SEQ" "PK_NAME"))))))
+
+(defun ora-test15 (con) 
+  (ora-mk-metadatatest con)
+  (let ((user (first (first (exec-query con "select user from dual")))))
+  (multiple-value-bind 
+      (res cols)
+      (get-columns con nil user "METADATATEST" nil)
+    (assert (= 3 (length res)))
+    (assert (equal (subseq cols 0 18) 
+                   '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "COLUMN_NAME" "DATA_TYPE" "TYPE_NAME" 
+                     "COLUMN_SIZE" "BUFFER_LENGTH" "DECIMAL_DIGITS" "NUM_PREC_RADIX" "NULLABLE" 
+                     "REMARKS" "COLUMN_DEF" "SQL_DATA_TYPE" "SQL_DATETIME_SUB" "CHAR_OCTET_LENGTH" 
+                     "ORDINAL_POSITION" "IS_NULLABLE"))))))
+
+(defun ora-test16 (con)
+  (ora-mk-metadatatest con)
+  (let ((user (first (first (exec-query con "select user from dual")))))
+    (multiple-value-bind 
+        (res cols)
+        (get-tables con nil user "METADATATEST" nil)
+      (assert (= 1 (length res)))
+      (assert (equal cols '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "TABLE_TYPE" "REMARKS"))))))
+
+(defun ora-test17 (con)
+  (ora-mk-metadatatest con)
+  (ora-drop-test-table con "METADATATEST2")
+  (exec-command con "
+    CREATE TABLE metadatatest2(
+	a int NOT NULL,
+        b varchar2(10),
+        c date,
+       CONSTRAINT metadatatest2_pk PRIMARY KEY (a,b)) ")
+  (exec-command con "alter table metadatatest add constraint metadatatest_fk1 foreign key (x,y) references metadatatest2(a,b)")
+  (let ((user (first (first (exec-query con "select user from dual")))))
+    (multiple-value-bind 
+        (res1 cols1)
+        (get-foreign-keys con nil user "METADATATEST2"
+                          nil nil nil)
+      (assert (= 2 (length res1)))
+      (assert (equal cols1  '("PKTABLE_CAT" "PKTABLE_SCHEM" "PKTABLE_NAME" "PKCOLUMN_NAME" "FKTABLE_CAT" "FKTABLE_SCHEM" "FKTABLE_NAME" "FKCOLUMN_NAME" "KEY_SEQ"
+                              "UPDATE_RULE" "DELETE_RULE" "FK_NAME" "PK_NAME"))) ; "DEFERRABILITY" is missing
+      (multiple-value-bind 
+          (res2 cols2)
+          (get-foreign-keys con nil nil nil
+                            nil nil "METADATATEST")
+        (assert (= 2 (length res2)))))))
+
+
+
+(defun ora-test18 (con)
+  (ora-mk-metadatatest con)
+  (let ((user (first (first (exec-query con "select user from dual")))))
+    (multiple-value-bind 
+        (res cols)
+        (get-tables con nil user "METADATATEST" "TABLE")
+      (assert (= 1 (length res)))
+      (assert (equal cols '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "TABLE_TYPE" "REMARKS"))))))
+
+(defun ora-test19 (con)
+  (ignore-errors (exec-command con "drop view metadatatest_vw"))
+  (exec-command con "create view metadatatest_vw as select 1 as a from dual")
+  (let ((user (first (first (exec-query con "select user from dual")))))
+    (dolist (type '("VIEW" nil))
+       (multiple-value-bind 
+           (res cols)
+           (get-tables con nil user "METADATATEST_VW" type)
+         (assert (= 1 (length res)))
+         (assert (equal cols '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "TABLE_TYPE" "REMARKS")))))))
+

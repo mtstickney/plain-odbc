@@ -7,42 +7,52 @@
 
 
 (defun run-sql-server-tests (con)
-  (dolist (sym '(ss-type-test 
-                 ss-test1 
-                 ss-test2 
-                 ss-test3 
-                 ss-test4 
-                 ss-test5 
-                 ss-test6   ss-test7 
-                 ss-test8 
-                 ss-test8a 
-                 ss-test9 
-                 ss-test10 
-                 ss-test11 
-                 ss-test12 
-                 ss-test13 
-                 ss-test14 
-                 ss-test15 
-                 ss-test16 
-                 ss-test17 
-                 ss-test18 
-                 ss-test19 
-                 ss-test20 
-                 ss-test21 
-                 ss-test22
-                 ss-test23
-                 ss-test24
-                 ss-test25
-                 ss-test26
-                 ss-test27
-                 ss-test28
-                 ss-test29
-                 ss-test30
-                 ss-test31
-                 ss-test32
-                 ))
-    (pprint sym)
-    (funcall sym con)))
+  (flet ((doit () 
+           (dolist (sym '(ss-type-test 
+                          ss-test1 
+                          ss-test2 
+                          ss-test3 
+                          ss-test4 
+                          ss-test5 
+                          ss-test6   
+                          ss-test7 
+                          ss-test8 
+                          ss-test8a 
+                          ss-test9 
+                          ss-test10 
+                          ss-test11 
+                          ss-test12 
+                          ss-test13 
+                          ss-test14 
+                          ss-test15 
+                          ss-test16 
+                          ss-test17 
+                          ss-test18 
+                          ss-test19 
+                          ss-test20 
+                          ss-test21 
+                          ss-test22
+                          ss-test23
+                          ss-test24
+                          ss-test25
+                          ss-test26
+                          ss-test27
+                          ss-test28
+                          ss-test29
+                          ss-test30
+                          ss-test31
+                          ss-test32
+                          ))
+             (pprint sym)
+             (funcall sym con))))
+      (format t "with use-bind~%")
+    (setf (use-bind-column con) t)
+    (doit)
+    (format t "~%~%no use-bind~%")
+    (setf (use-bind-column con) nil)
+    (doit)
+    ))
+    
 
 (defparameter *sql-server-type_test-ddl* "
 CREATE TABLE [type_test] (
@@ -537,7 +547,7 @@ CREATE TABLE [type_test] (
 ;; tests for 
 
 
-(defun mk-metadatatest (con)
+(defun ss-mk-metadatatest (con)
   (ss-drop-test-table con "metadatatest")
   (exec-command con "
     CREATE TABLE metadatatest(
@@ -558,7 +568,7 @@ CREATE TABLE [type_test] (
         (funcall fun catalog schema)))))
   
 (defun ss-test27 (con)
-  (mk-metadatatest con)
+  (ss-mk-metadatatest con)
   (schema-loop
    con 
    (lambda (catalog schema)
@@ -569,7 +579,7 @@ CREATE TABLE [type_test] (
        (assert (equal cols '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "COLUMN_NAME" "KEY_SEQ" "PK_NAME")))))))
 
 (defun ss-test28 (con) 
-  (mk-metadatatest con)
+  (ss-mk-metadatatest con)
    (schema-loop
     con 
     (lambda (catalog schema)
@@ -586,7 +596,7 @@ CREATE TABLE [type_test] (
 
 
 (defun ss-test29 (con)
-  (mk-metadatatest con)
+  (ss-mk-metadatatest con)
   (schema-loop
    con 
    (lambda (catalog schema)
@@ -597,7 +607,7 @@ CREATE TABLE [type_test] (
        (assert (equal cols '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "TABLE_TYPE" "REMARKS")))))))
   
 (defun ss-test30 (con)
-  (mk-metadatatest con)
+  (ss-mk-metadatatest con)
   (ss-drop-test-table con "metadatatest2")
   (exec-command con "
     CREATE TABLE metadatatest2(
@@ -624,7 +634,7 @@ CREATE TABLE [type_test] (
 
 
 (defun ss-test31 (con)
-  (mk-metadatatest con)
+  (ss-mk-metadatatest con)
   (schema-loop
    con 
    (lambda (catalog schema)
@@ -646,3 +656,4 @@ CREATE TABLE [type_test] (
            (get-tables con catalog schema "metadatatest_vw" type)
          (assert (= 1 (length res)))
          (assert (equal cols '("TABLE_CAT" "TABLE_SCHEM" "TABLE_NAME" "TABLE_TYPE" "REMARKS"))))))))
+
