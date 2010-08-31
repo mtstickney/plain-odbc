@@ -45,7 +45,7 @@
                           ))
              (pprint sym)
              (funcall sym con))))
-      (format t "with use-bind~%")
+    (format t "with use-bind~%")
     (setf (use-bind-column con) t)
     (doit)
     (format t "~%~%no use-bind~%")
