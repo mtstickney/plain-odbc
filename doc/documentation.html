@@ -353,7 +353,7 @@ mysql_free_result(result);<br>
     and the cdr is a parameter description, or it is for example 
     <tt>("this is a string" :string :in 100)</tt> or 
     <tt>(#(1 2 3 4) :binary :in 20)</tt>. Otherwise it is assumed that this
-    is the actual parameter and a statement specification is computed based on
+    is the actual parameter and a parameter specification is computed based on
     this value. 
     <ul>
       <li><tt>NIL</tt> is passed as parameter :string.
@@ -446,13 +446,14 @@ mysql_free_result(result);<br>
               The name of the template odbc datasource for this function is
               <tt>default-mysql-dsn</tt>.
       </p>
-
       <p>
         <br><b>[Function]</b><br>
             <tt>connect-sqlite <i>databasefile</i></tt><br>
               Open the Sqlite database with filename <i>databasefile</i>.
               <tt>default-sqlite-dsn</tt>.
               The <i>databasefile</i> must already exist.
+              The name of the template odbc datasource for this function is 
+              <tt>default-sqlite-dsn</tt>.
       </p>
 
     <h3>Working with Connections</h3>
@@ -464,7 +465,7 @@ mysql_free_result(result);<br>
             or use the function SQLGetData. This property determines which method is used.
             The default value is <tt>t</tt>. It can be changed anytime, this affects only queries 
             that will be executed in the future. Usually the default value is fine. 
-            But SQLite (or its ODBC driver) has some quirks. For more Information see the 
+            But SQLite (or its ODBC driver) has some quirks. For more information see the 
             ODBC documentation on SQLGetData.
       </p>
       <br><b>[Function]</b><br>
