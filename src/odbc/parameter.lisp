@@ -272,10 +272,11 @@
 
 (defmethod initialize-parameter ((param binary-parameter) args)
   (let ((length-of-buffer (or (car args) *default-binary-parameter-size* )))
-    (with-slots (value-type parameter-type buffer-length value-ptr
+    (with-slots (value-type parameter-type column-size buffer-length value-ptr
                             ind-ptr) param
       (setf value-type $SQL_C_BINARY)
       (setf parameter-type $SQL_VARBINARY)
+      (setf column-size length-of-buffer)
       (setf buffer-length length-of-buffer)
       (setf value-ptr (cffi:foreign-alloc :uchar :count length-of-buffer)))))
 
