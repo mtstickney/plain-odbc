@@ -35,7 +35,7 @@
 ; position is needed for data at exec time
 (defun create-parameter (query position lisp-type direction args)
   (let ((class-name
-          (ecase lisp-type 
+          (ecase lisp-type
             (:string 'string-parameter)
             (:unicode-string 'unicode-string-parameter)
             (:integer 'integer-parameter)
@@ -45,8 +45,8 @@
             (:clob 'clob-parameter)
             (:unicode-clob 'uclob-parameter)
             (:blob 'blob-parameter))))
-    (let ((param (make-instance class-name 
-                                :direction direction 
+    (let ((param (make-instance class-name
+                                :direction direction
                                 :lisp-type lisp-type
                                 :position position
                                 :query query)))
@@ -75,7 +75,7 @@
 (defmethod free-parameter ((param parameter))
   (with-slots (value-ptr ind-ptr) param
     (cffi:foreign-free value-ptr)
-    (setf value-ptr nil) 
+    (setf value-ptr nil)
     (cffi:foreign-free ind-ptr)
     (setf ind-ptr nil)))
 
@@ -97,7 +97,7 @@
 
 (defmethod initialize-parameter ((param string-parameter) args)
   (let ((length-of-buffer (or (car args) *default-string-parameter-size*)))
-    (with-slots (value-type parameter-type buffer-length 
+    (with-slots (value-type parameter-type buffer-length
                             column-size value-ptr
                             ind-ptr) param
       (setf value-type $SQL_C_CHAR)
@@ -133,7 +133,7 @@
 (defmethod initialize-parameter ((param unicode-string-parameter) args)
   (let ((length-of-buffer
          (* 2 (or (car args) *default-string-parameter-size*))))
-    (with-slots (value-type parameter-type buffer-length 
+    (with-slots (value-type parameter-type buffer-length
                             column-size value-ptr
                             ind-ptr) param
       (setf value-type $SQL_C_WCHAR)
@@ -165,7 +165,7 @@
 ;; integer parameter
 ;;----------------------
 
-(defclass integer-parameter (direct-parameter) 
+(defclass integer-parameter (direct-parameter)
   ())
 
 (defmethod initialize-parameter ((param integer-parameter) args)
@@ -297,7 +297,7 @@
 
 (defmethod get-parameter-value ((param binary-parameter))
   (let ((len (cffi:mem-ref (slot-value param 'ind-ptr) 'sql-len)))
-    (if (= len $SQL_NULL_DATA) 
+    (if (= len $SQL_NULL_DATA)
         nil
         (get-byte-vector (slot-value param 'value-ptr) len))))
 
@@ -310,8 +310,8 @@
 ;;; (setf (cffi:mem-ref (slot-value param 'ind-ptr) 'sql-len)
 ;;;              (%sql-len-data-at-exec (length value))))))
 ;;; At execution time the result of %sql-execute or %sql-exec-direct
-;;; is $SQL_NEED_DATA. 
-;;; The next call to %sql-param-data gives the address of the data buffer 
+;;; is $SQL_NEED_DATA.
+;;; The next call to %sql-param-data gives the address of the data buffer
 ;;; of the needed bind parameter.
 ;;; For the LOB parameters we store in this buffer the position of the
 ;;; bind parameter. At execution time we get the buffer address of the
@@ -319,7 +319,7 @@
 ;;; and so we know which parameter to send.
 ;;; see functions exec-sql-statement and sql-param-data-position
 ;;; in odbc-main.lisp
-;;; there is also the Microsoft documentation on SQLPutData, SQLParamData, 
+;;; there is also the Microsoft documentation on SQLPutData, SQLParamData,
 ;;;  SQL_NEED_DATA  and etc.
 
 ;;;-----------------------
@@ -339,7 +339,7 @@
                           ind-ptr) param
     (setf value-type $SQL_C_CHAR)
     (setf parameter-type $SQL_LONGVARCHAR)
-    ;; the value-ptr will be needed to find the parameter,  
+    ;; the value-ptr will be needed to find the parameter,
     ;; we store the position there
     (setf buffer-length (cffi:foreign-type-size :long))
     (setf value-ptr (cffi:foreign-alloc :long))))
@@ -366,7 +366,7 @@
     (let ((pos 0))
       (loop
         (let ((len (min (- value-len pos) buffer-length)))
-          (put-string buffer 
+          (put-string buffer
                     (subseq temp-val pos (+ pos len)))
           (let ((res (%sql-put-data hstmt buffer len)))
             (declare (ignore res))
@@ -389,7 +389,7 @@
                           ind-ptr) param
     (setf value-type $SQL_C_WCHAR)
     (setf parameter-type $SQL_WLONGVARCHAR)
-    ;; the value-ptr will be needed to find the parameter,  
+    ;; the value-ptr will be needed to find the parameter,
     ;; we store the position there
     (setf buffer-length (cffi:foreign-type-size :long))
     (setf value-ptr (cffi:foreign-alloc ':long))))
@@ -413,10 +413,10 @@
     (let ((pos 0))
       (loop
         (let ((len (min (- value-len pos) buffer-length-in-chars)))
-          (%put-unicode-string buffer 
+          (%put-unicode-string buffer
                     (subseq temp-val pos (+ pos len)))
           (let ((res (%sql-put-data hstmt buffer (* 2 len))))
-            
+
             (declare (ignore res))
             (setf pos (+ pos len))
             (if (>= pos value-len)
@@ -438,7 +438,7 @@
                           ind-ptr) param
     (setf value-type $SQL_C_BINARY)
     (setf parameter-type $SQL_LONGVARBINARY)
-    ;; the value-ptr will be needed to find the parameter, 
+    ;; the value-ptr will be needed to find the parameter,
     ;; we store the position there
     (setf buffer-length (cffi:foreign-type-size :long))
     (setf value-ptr (cffi:foreign-alloc :long)))
@@ -466,4 +466,3 @@
     (let ((res (%sql-put-data hstmt buffer len)))
       (declare (ignore res)))
     (cffi:foreign-free buffer)))
-
