@@ -102,7 +102,7 @@
                             ind-ptr) param
       (setf value-type $SQL_C_CHAR)
       (setf parameter-type $SQL_VARCHAR)
-      (setf column-size length-of-buffer)
+      (setf column-size (max length-of-buffer 1))
       (setf buffer-length length-of-buffer)
       (setf value-ptr (alloc-chars length-of-buffer)))))
 
@@ -138,7 +138,7 @@
                             ind-ptr) param
       (setf value-type $SQL_C_WCHAR)
       (setf parameter-type $SQL_WVARCHAR)
-      (setf column-size length-of-buffer)
+      (setf column-size (max length-of-buffer 1))
       (setf buffer-length length-of-buffer)
       (setf value-ptr (cffi:foreign-alloc :uint8 :count length-of-buffer)))))
 
@@ -276,7 +276,7 @@
                             ind-ptr) param
       (setf value-type $SQL_C_BINARY)
       (setf parameter-type $SQL_VARBINARY)
-      (setf column-size length-of-buffer)
+      (setf column-size (max length-of-buffer 1))
       (setf buffer-length length-of-buffer)
       (setf value-ptr (cffi:foreign-alloc :uchar :count length-of-buffer)))))
 
